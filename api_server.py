@@ -61,6 +61,18 @@ def chat():
 
 
 
+@app.route('/', methods=['GET'])
+def home():
+    return jsonify({
+        'message': 'ChatX API is running',
+        'status': 'healthy',
+        'endpoints': {
+            'chat': '/api/chat',
+            'health': '/api/health',
+            'image': '/api/image/<filename>'
+        }
+    })
+
 @app.route('/api/health', methods=['GET'])
 def health():
     return jsonify({'status': 'healthy'})
