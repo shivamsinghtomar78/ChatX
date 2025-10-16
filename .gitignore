@@ -1,5 +1,38 @@
+# Environment
 .env
-myenv
-chatbot.db
+*.env
+
+# Python
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+
+# Database
+*.db
+*.db-shm
+*.db-wal
+
+# Generated files
+static/*.png
+static/*.jpg
+uploads/*.png
+uploads/*.jpg
+
+# Node modules
+frontend/node_modules/
+frontend/build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
