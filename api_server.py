@@ -64,10 +64,28 @@ def chat():
 @app.route('/static/<path:path>')
 def serve_static(path):
     import os
-    static_dir = 'frontend/build/static'
-    if os.path.exists(os.path.join(static_dir, path)):
-        return send_from_directory(static_dir, path)
-    return jsonify({'error': 'Static file not found'}), 404
+    
+    # Try multiple possible locations
+    possible_dirs = [
+        'frontend/build/static',
+        'build/static', 
+        'static'
+    ]
+    
+    for static_dir in possible_dirs:
+        full_path = os.path.join(static_dir, path)
+        if os.path.exists(full_path):
+            print(f"[DEBUG] Serving static file: {full_path}")
+            return send_from_directory(static_dir, path)
+    
+    # Debug: List what files actually exist
+    print(f"[DEBUG] Static file not found: {path}")
+    for static_dir in possible_dirs:
+        if os.path.exists(static_dir):
+            files = os.listdir(static_dir)
+            print(f"[DEBUG] Files in {static_dir}: {files}")
+    
+    return jsonify({'error': f'Static file not found: {path}'}), 404
 
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
