@@ -67,12 +67,6 @@ def serve_static(path):
     import os
     return send_from_directory('frontend/build/static', path)
 
-# API routes
-@app.route('/api/chat', methods=['POST'])
-def chat():
-    # ... existing chat function
-    pass
-
 # Catch-all route for React app (must be LAST)
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
