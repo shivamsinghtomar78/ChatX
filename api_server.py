@@ -61,47 +61,33 @@ def chat():
 
 
 
+# Static files must come BEFORE catch-all route
 @app.route('/static/<path:path>')
 def serve_static(path):
     import os
-    
-    # Try multiple possible locations
-    possible_dirs = [
-        'frontend/build/static',
-        'build/static', 
-        'static'
-    ]
-    
-    for static_dir in possible_dirs:
-        full_path = os.path.join(static_dir, path)
-        if os.path.exists(full_path):
-            print(f"[DEBUG] Serving static file: {full_path}")
-            return send_from_directory(static_dir, path)
-    
-    # Debug: List what files actually exist
-    print(f"[DEBUG] Static file not found: {path}")
-    for static_dir in possible_dirs:
-        if os.path.exists(static_dir):
-            files = os.listdir(static_dir)
-            print(f"[DEBUG] Files in {static_dir}: {files}")
-    
-    return jsonify({'error': f'Static file not found: {path}'}), 404
+    return send_from_directory('frontend/build/static', path)
 
+# API routes
+@app.route('/api/chat', methods=['POST'])
+def chat():
+    # ... existing chat function
+    pass
+
+# Catch-all route for React app (must be LAST)
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
 def serve_frontend(path):
     import os
     
-    # Skip API routes
+    # Skip API routes that should have been handled above
     if path.startswith('api/'):
-        return jsonify({'error': 'Not found'}), 404
+        return jsonify({'error': 'API endpoint not found'}), 404
     
-    # Serve static files
-    if path and os.path.exists(os.path.join('frontend/build', path)):
-        return send_from_directory('frontend/build', path)
-    
-    # Serve index.html for all other routes
-    return send_from_directory('frontend/build', 'index.html')
+    # Always serve index.html for React routing
+    try:
+        return send_from_directory('frontend/build', 'index.html')
+    except:
+        return jsonify({'error': 'Frontend not built'}), 500
 
 @app.route('/api/health', methods=['GET'])
 def health():
