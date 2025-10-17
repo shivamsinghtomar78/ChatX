@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from langgraph_tool_backend import chatbot
 from langchain_core.messages import HumanMessage, AIMessage
@@ -61,17 +61,17 @@ def chat():
 
 
 
-@app.route('/', methods=['GET'])
-def home():
-    return jsonify({
-        'message': 'ChatX API is running',
-        'status': 'healthy',
-        'endpoints': {
-            'chat': '/api/chat',
-            'health': '/api/health',
-            'image': '/api/image/<filename>'
-        }
-    })
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def serve_frontend(path):
+    from flask import send_from_directory
+    import os
+    
+    # Serve React build files
+    if path != "" and os.path.exists(os.path.join('frontend/build', path)):
+        return send_from_directory('frontend/build', path)
+    else:
+        return send_from_directory('frontend/build', 'index.html')
 
 @app.route('/api/health', methods=['GET'])
 def health():

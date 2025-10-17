@@ -93,7 +93,7 @@ const App = () => {
   const callAPI = async (message, threadId) => {
     setIsTyping(true);
     try {
-      const response = await fetch('http://localhost:5000/api/chat', {
+      const response = await fetch('/api/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -185,7 +185,7 @@ const App = () => {
       const afterParts = parts[1].split(']');
       const filename = afterParts[0];
       const afterImage = afterParts[1] || '';
-      const imageUrl = `http://localhost:5000/api/image/${filename}`;
+      const imageUrl = `/api/image/${filename}`;
       
       return (
         <div>
