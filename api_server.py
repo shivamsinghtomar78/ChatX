@@ -61,17 +61,25 @@ def chat():
 
 
 
+@app.route('/static/<path:filename>')
+def serve_static(filename):
+    return send_from_directory('frontend/build/static', filename)
+
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
 def serve_frontend(path):
-    from flask import send_from_directory
     import os
     
-    # Serve React build files
-    if path != "" and os.path.exists(os.path.join('frontend/build', path)):
+    # Skip API routes
+    if path.startswith('api/'):
+        return jsonify({'error': 'Not found'}), 404
+    
+    # Serve static files
+    if path and os.path.exists(os.path.join('frontend/build', path)):
         return send_from_directory('frontend/build', path)
-    else:
-        return send_from_directory('frontend/build', 'index.html')
+    
+    # Serve index.html for all other routes
+    return send_from_directory('frontend/build', 'index.html')
 
 @app.route('/api/health', methods=['GET'])
 def health():
