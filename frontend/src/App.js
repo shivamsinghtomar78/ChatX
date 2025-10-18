@@ -177,8 +177,27 @@ const App = () => {
     }
   };
 
+  const formatText = (text) => {
+    return text.split('\n').map((line, i) => {
+      if (line.trim().startsWith('*') || line.trim().startsWith('-')) {
+        return <li key={i} style={{ marginLeft: '20px', listStyle: 'disc' }}>{line.trim().substring(1).trim()}</li>;
+      }
+      if (/^\d+\./.test(line.trim())) {
+        return <li key={i} style={{ marginLeft: '20px', listStyle: 'decimal' }}>{line.trim().replace(/^\d+\.\s*/, '')}</li>;
+      }
+      if (line.includes('**')) {
+        const parts = line.split('**');
+        return (
+          <p key={i}>
+            {parts.map((part, j) => j % 2 === 1 ? <strong key={j}>{part}</strong> : part)}
+          </p>
+        );
+      }
+      return line ? <p key={i}>{line}</p> : <br key={i} />;
+    });
+  };
+
   const renderMessageContent = (content) => {
-    // Check if message contains image marker
     if (content.includes('[IMAGE_GENERATED:')) {
       const parts = content.split('[IMAGE_GENERATED:');
       const beforeImage = parts[0];
@@ -189,7 +208,7 @@ const App = () => {
       
       return (
         <div>
-          <div>{beforeImage}</div>
+          {beforeImage && <div style={{ marginBottom: '12px' }}>{formatText(beforeImage)}</div>}
           <div className="generated-image" style={{ marginTop: '15px', marginBottom: '15px' }}>
             <img 
               src={imageUrl}
@@ -245,12 +264,12 @@ const App = () => {
               </button>
             </div>
           </div>
-          <div>{afterImage}</div>
+          {afterImage && <div style={{ marginTop: '12px' }}>{formatText(afterImage)}</div>}
         </div>
       );
     }
     
-    return content;
+    return formatText(content);
   };
 
   const filteredConversations = conversations.filter(conv =>
