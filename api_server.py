@@ -80,11 +80,34 @@ def serve_image(filename):
 # Static files
 @app.route('/static/<path:path>')
 def serve_static(path):
-    try:
-        return send_from_directory('frontend/build/static', path)
-    except Exception as e:
-        print(f"Static file error: {e}")
-        return jsonify({'error': 'Static file not found'}), 404
+    import os
+    
+    # Debug: Print what we're looking for
+    print(f"[DEBUG] Requested static file: {path}")
+    
+    # Check multiple possible locations
+    possible_paths = [
+        f'frontend/build/static/{path}',
+        f'build/static/{path}',
+        f'static/{path}'
+    ]
+    
+    for full_path in possible_paths:
+        print(f"[DEBUG] Checking: {full_path} - Exists: {os.path.exists(full_path)}")
+        if os.path.exists(full_path):
+            directory = os.path.dirname(full_path)
+            filename = os.path.basename(full_path)
+            print(f"[DEBUG] Serving from: {directory}/{filename}")
+            return send_from_directory(directory, filename)
+    
+    # Debug: List what files actually exist
+    for check_dir in ['frontend/build/static', 'build/static', 'static', 'frontend/build', '.']:
+        if os.path.exists(check_dir):
+            files = os.listdir(check_dir)
+            print(f"[DEBUG] Files in {check_dir}: {files[:10]}")
+    
+    print(f"[DEBUG] Static file not found anywhere: {path}")
+    return jsonify({'error': f'Static file not found: {path}'}), 404
 
 # Catch-all route for React app (MUST BE LAST)
 @app.route('/', defaults={'path': ''})
