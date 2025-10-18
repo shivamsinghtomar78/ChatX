@@ -6,12 +6,13 @@ import uuid
 import os
 
 app = Flask(__name__)
-CORS(app, origins=['http://localhost:3000'])
+CORS(app, origins=['*'])  # Allow all origins for production
 
 # Ensure directories exist
 os.makedirs('static', exist_ok=True)
 os.makedirs('uploads', exist_ok=True)
 
+# API routes FIRST
 @app.route('/api/chat', methods=['POST'])
 def chat():
     try:
@@ -59,30 +60,6 @@ def chat():
         print(f"Full traceback: {error_details}")
         return jsonify({'error': str(e)}), 500
 
-
-
-# Static files must come BEFORE catch-all route
-@app.route('/static/<path:path>')
-def serve_static(path):
-    import os
-    return send_from_directory('frontend/build/static', path)
-
-# Catch-all route for React app (must be LAST)
-@app.route('/', defaults={'path': ''})
-@app.route('/<path:path>')
-def serve_frontend(path):
-    import os
-    
-    # Skip API routes that should have been handled above
-    if path.startswith('api/'):
-        return jsonify({'error': 'API endpoint not found'}), 404
-    
-    # Always serve index.html for React routing
-    try:
-        return send_from_directory('frontend/build', 'index.html')
-    except:
-        return jsonify({'error': 'Frontend not built'}), 500
-
 @app.route('/api/health', methods=['GET'])
 def health():
     return jsonify({'status': 'healthy'})
@@ -90,8 +67,6 @@ def health():
 @app.route('/api/image/<filename>', methods=['GET'])
 def serve_image(filename):
     try:
-        from flask import send_file
-        import os
         # Sanitize filename to prevent path traversal
         filename = os.path.basename(filename)
         filepath = os.path.join(os.getcwd(), 'static', filename)
@@ -101,6 +76,33 @@ def serve_image(filename):
             return jsonify({'error': 'Image not found'}), 404
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+# Static files
+@app.route('/static/<path:path>')
+def serve_static(path):
+    try:
+        return send_from_directory('frontend/build/static', path)
+    except Exception as e:
+        print(f"Static file error: {e}")
+        return jsonify({'error': 'Static file not found'}), 404
+
+# Catch-all route for React app (MUST BE LAST)
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def serve_frontend(path):
+    # Skip API routes that should have been handled above
+    if path.startswith('api/'):
+        return jsonify({'error': 'API endpoint not found'}), 404
+    
+    # Always serve index.html for React routing
+    try:
+        if os.path.exists('frontend/build/index.html'):
+            return send_from_directory('frontend/build', 'index.html')
+        else:
+            return '<h1>ChatX Backend Running</h1><p>Frontend build not found</p>', 200
+    except Exception as e:
+        print(f"Frontend serve error: {e}")
+        return '<h1>ChatX API</h1><p>Backend is running</p>', 200
 
 if __name__ == '__main__':
     app.run(debug=False, port=5000)
