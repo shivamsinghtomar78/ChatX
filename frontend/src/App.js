@@ -549,7 +549,7 @@ const App = () => {
                 }}
                 style={{
                   padding: '6px 12px',
-                  backgroundColor: '#3b82f6',
+                  background: 'linear-gradient(135deg, #3b82f6, #6366f1)',
                   color: 'white',
                   border: 'none',
                   borderRadius: '6px',
@@ -563,7 +563,7 @@ const App = () => {
                 onClick={() => window.open(imageUrl, '_blank')}
                 style={{
                   padding: '6px 12px',
-                  backgroundColor: '#10b981',
+                  background: 'linear-gradient(135deg, #10b981, #3b82f6)',
                   color: 'white',
                   border: 'none',
                   borderRadius: '6px',
@@ -689,10 +689,10 @@ const App = () => {
           <div className="sidebar-header">
             <button 
               onClick={createNewConversation} 
-              className="new-chat-btn"
+              className={`new-chat-btn ${theme}`}
               aria-label="Create new conversation"
             >
-              + New Chat
+              <span aria-hidden="true">+</span> New Chat
             </button>
           </div>
 
