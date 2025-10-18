@@ -56,12 +56,20 @@ def chat():
 def health():
     return jsonify({'status': 'healthy'})
 
-@app.route('/static/<path:filename>')
-def serve_static(filename):
-    static_folder = os.path.join(os.path.dirname(__file__), 'frontend', 'build', 'static')
-    file_path = os.path.join(static_folder, filename)
+@app.route('/static/js/<path:filename>')
+def serve_js(filename):
+    js_folder = os.path.join(os.path.dirname(__file__), 'frontend', 'build', 'static', 'js')
+    file_path = os.path.join(js_folder, filename)
     if os.path.exists(file_path):
-        return send_file(file_path)
+        return send_file(file_path, mimetype='application/javascript')
+    return '', 404
+
+@app.route('/static/css/<path:filename>')
+def serve_css(filename):
+    css_folder = os.path.join(os.path.dirname(__file__), 'frontend', 'build', 'static', 'css')
+    file_path = os.path.join(css_folder, filename)
+    if os.path.exists(file_path):
+        return send_file(file_path, mimetype='text/css')
     return '', 404
 
 @app.route('/')
