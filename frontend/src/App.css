@@ -660,3 +660,456 @@ body {
   font-weight: 600;
   color: #fff;
 }
+
+/* Message Footer with Actions */
+.message-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.copy-btn-msg {
+  background: transparent;
+  border: 1px solid #333;
+  color: #888;
+  padding: 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s ease;
+  opacity: 0;
+}
+
+.message:hover .copy-btn-msg {
+  opacity: 1;
+}
+
+.copy-btn-msg:hover {
+  background: #2a2a2a;
+  color: #3b82f6;
+  border-color: #3b82f6;
+}
+
+/* Error Banner */
+.error-banner {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: white;
+  padding: 12px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  animation: slideDown 0.3s ease;
+  border-bottom: 1px solid #991b1b;
+}
+
+.error-banner button {
+  background: transparent;
+  border: none;
+  color: white;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 0 8px;
+}
+
+@keyframes slideDown {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Typing Text */
+.typing-text {
+  font-size: 12px;
+  color: #666;
+  margin-top: 4px;
+  font-style: italic;
+}
+
+/* Markdown Styling */
+.message.assistant .message-text h1 {
+  font-size: 24px;
+  margin: 20px 0 12px 0;
+  color: #fff;
+  border-bottom: 2px solid #3b82f6;
+  padding-bottom: 8px;
+}
+
+.message.assistant .message-text h2 {
+  font-size: 20px;
+  margin: 16px 0 10px 0;
+  color: #e5e5e5;
+}
+
+.message.assistant .message-text h3 {
+  font-size: 18px;
+  margin: 14px 0 8px 0;
+  color: #d0d0d0;
+}
+
+.message.assistant .message-text ul {
+  list-style: disc;
+  padding-left: 24px;
+  margin: 12px 0;
+}
+
+.message.assistant .message-text ol {
+  list-style: decimal;
+  padding-left: 24px;
+  margin: 12px 0;
+}
+
+.message.assistant .message-text li {
+  margin: 6px 0;
+  line-height: 1.6;
+}
+
+.message.assistant .message-text code {
+  background: #0a0a0a;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+  color: #10b981;
+  border: 1px solid #333;
+}
+
+.message.assistant .message-text pre {
+  background: #0a0a0a;
+  padding: 16px;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin: 12px 0;
+  border: 1px solid #333;
+}
+
+.message.assistant .message-text pre code {
+  background: none;
+  padding: 0;
+  border: none;
+  color: #10b981;
+}
+
+.message.assistant .message-text blockquote {
+  border-left: 4px solid #3b82f6;
+  padding-left: 16px;
+  margin: 12px 0;
+  color: #a0a0a0;
+  font-style: italic;
+}
+
+.message.assistant .message-text a {
+  color: #3b82f6;
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.message.assistant .message-text a:hover {
+  border-bottom-color: #3b82f6;
+}
+
+.message.assistant .message-text table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12px 0;
+}
+
+.message.assistant .message-text th,
+.message.assistant .message-text td {
+  padding: 8px 12px;
+  border: 1px solid #333;
+  text-align: left;
+}
+
+.message.assistant .message-text th {
+  background: #0a0a0a;
+  font-weight: 600;
+  color: #fff;
+}
+
+/* Smooth Message Entry */
+.message {
+  animation: messageSlideIn 0.3s ease;
+}
+
+@keyframes messageSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Enhanced Scrollbar */
+.messages-container::-webkit-scrollbar {
+  width: 8px;
+}
+
+.messages-container::-webkit-scrollbar-track {
+  background: #0f0f0f;
+}
+
+.messages-container::-webkit-scrollbar-thumb {
+  background: #3b82f6;
+  border-radius: 4px;
+}
+
+.messages-container::-webkit-scrollbar-thumb:hover {
+  background: #2563eb;
+}
+
+/* Auto-resize Textarea */
+.message-input {
+  overflow-y: hidden;
+  transition: height 0.1s ease;
+}
+
+/* Placeholder Enhancement */
+.message-input::placeholder {
+  color: #666;
+  font-size: 14px;
+}
+
+/* Focus State Enhancement */
+.input-container:focus-within {
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  border-radius: 12px;
+}
+
+/* Send Button Enhancement */
+.send-btn {
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.send-btn.active::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+  z-index: -1;
+  opacity: 0.5;
+  filter: blur(8px);
+}
+
+/* Conversation Item Enhancement */
+.conversation-item {
+  position: relative;
+  overflow: hidden;
+}
+
+.conversation-item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+  transition: width 0.2s ease;
+}
+
+.conversation-item.active::before {
+  width: 3px;
+}
+
+/* Welcome Screen Enhancement */
+.welcome-content {
+  animation: fadeIn 0.5s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Suggestion Card Hover Effect */
+.suggestion-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.suggestion-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(139, 92, 246, 0.1));
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.suggestion-card:hover::before {
+  opacity: 1;
+}
+
+/* Header Actions */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.export-btn, .clear-btn, .regen-btn, .theme-btn, .search-chat-btn {
+  background: #2a2a2a;
+  border: 1px solid #333;
+  color: #e5e5e5;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+.export-btn:hover, .clear-btn:hover, .regen-btn:hover, .theme-btn:hover, .search-chat-btn:hover {
+  background: #3b82f6;
+  border-color: #3b82f6;
+  transform: translateY(-1px);
+}
+
+/* Search in Chat */
+.search-in-chat {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  background: #1a1a1a;
+  border-bottom: 1px solid #333;
+  animation: slideDown 0.3s ease;
+}
+
+.search-chat-input {
+  flex: 1;
+  padding: 8px 12px;
+  background: #0f0f0f;
+  border: 1px solid #333;
+  border-radius: 6px;
+  color: white;
+  font-size: 14px;
+}
+
+.search-chat-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+}
+
+.search-in-chat button {
+  background: transparent;
+  border: none;
+  color: #888;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 4px 8px;
+}
+
+.search-in-chat button:hover {
+  color: #ef4444;
+}
+
+/* Light Theme */
+body.light {
+  background: #f5f5f5;
+  color: #1a1a1a;
+}
+
+.light .app {
+  background: linear-gradient(135deg, #ffffff 0%, #f5f5f5 100%);
+}
+
+.light .sidebar {
+  background: linear-gradient(180deg, #ffffff 0%, #f9fafb 100%);
+  border-right: 1px solid #e5e7eb;
+}
+
+.light .main-area {
+  background: #ffffff;
+}
+
+.light .header {
+  background: #ffffff;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.light .message.assistant .message-text {
+  background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
+  border: 1px solid #e5e7eb;
+  color: #1a1a1a;
+}
+
+.light .message.user .message-text {
+  background: #3b82f6;
+  color: white;
+}
+
+.light .message-input {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  color: #1a1a1a;
+}
+
+.light .new-chat-btn {
+  background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+}
+
+.light .conversation-item {
+  color: #1a1a1a;
+}
+
+.light .conversation-item:hover {
+  background: #f3f4f6;
+}
+
+.light .conversation-item.active {
+  background: #e5e7eb;
+}
+
+.light .search-input {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  color: #1a1a1a;
+}
+
+.light .export-btn, .light .clear-btn, .light .regen-btn, .light .theme-btn, .light .search-chat-btn {
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  color: #1a1a1a;
+}
+
+.light .message.assistant .message-text code {
+  background: #e5e7eb;
+  color: #059669;
+  border: 1px solid #d1d5db;
+}
+
+.light .message.assistant .message-text pre {
+  background: #1a1a1a;
+  border: 1px solid #374151;
+}
+
+/* Syntax Highlighter Override */
+.message.assistant .message-text pre > div {
+  margin: 0 !important;
+  background: transparent !important;
+}
+
+/* Highlight Search Results */
+.message.highlight {
+  background: rgba(59, 130, 246, 0.1);
+  border-left: 3px solid #3b82f6;
+  padding-left: 12px;
+}

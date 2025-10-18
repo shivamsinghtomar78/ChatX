@@ -1,4 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import './App.css';
 
 const App = () => {
@@ -8,6 +11,23 @@ const App = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [message, setMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [error, setError] = useState(null);
+  const [theme, setTheme] = useState('dark');
+  const [searchInChat, setSearchInChat] = useState('');
+  const [showSearch, setShowSearch] = useState(false);
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('chatx-theme') || 'dark';
+    setTheme(savedTheme);
+    document.body.className = savedTheme;
+  }, []);
+
+  const toggleTheme = () => {
+    const newTheme = theme === 'dark' ? 'light' : 'dark';
+    setTheme(newTheme);
+    localStorage.setItem('chatx-theme', newTheme);
+    document.body.className = newTheme;
+  };
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
 
@@ -92,6 +112,7 @@ const App = () => {
 
   const callAPI = async (message, threadId) => {
     setIsTyping(true);
+    setError(null);
     try {
       const response = await fetch('/api/chat', {
         method: 'POST',
@@ -106,12 +127,17 @@ const App = () => {
         })
       });
       
+      if (!response.ok) {
+        throw new Error(`Server error: ${response.status}`);
+      }
+      
       const data = await response.json();
       setIsTyping(false);
       return data.response || 'Sorry, I could not process your request.';
     } catch (error) {
       setIsTyping(false);
-      return 'Error: Could not connect to server.';
+      setError('Connection failed. Check if backend is running on port 5000.');
+      return 'Error: Could not connect to server. Please check backend.';
     }
   };
 
@@ -177,24 +203,64 @@ const App = () => {
     }
   };
 
-  const formatText = (text) => {
-    return text.split('\n').map((line, i) => {
-      if (line.trim().startsWith('*') || line.trim().startsWith('-')) {
-        return <li key={i} style={{ marginLeft: '20px', listStyle: 'disc' }}>{line.trim().substring(1).trim()}</li>;
-      }
-      if (/^\d+\./.test(line.trim())) {
-        return <li key={i} style={{ marginLeft: '20px', listStyle: 'decimal' }}>{line.trim().replace(/^\d+\.\s*/, '')}</li>;
-      }
-      if (line.includes('**')) {
-        const parts = line.split('**');
-        return (
-          <p key={i}>
-            {parts.map((part, j) => j % 2 === 1 ? <strong key={j}>{part}</strong> : part)}
-          </p>
-        );
-      }
-      return line ? <p key={i}>{line}</p> : <br key={i} />;
-    });
+  const handleTextareaChange = (e) => {
+    setMessage(e.target.value);
+    e.target.style.height = 'auto';
+    e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
+  };
+
+  const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text);
+  };
+
+  const exportChat = () => {
+    if (!activeConversation) return;
+    const chatText = activeConversation.messages.map(msg => 
+      `${msg.role === 'user' ? 'You' : 'AI'}: ${msg.content}`
+    ).join('\n\n');
+    const blob = new Blob([chatText], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `chat-${activeConversation.title}-${Date.now()}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const clearChat = () => {
+    if (!activeConversation || !window.confirm('Clear this conversation?')) return;
+    const clearedConv = { ...activeConversation, messages: [] };
+    setConversations(prev => prev.map(conv => 
+      conv.id === clearedConv.id ? clearedConv : conv
+    ));
+    setActiveConversation(clearedConv);
+  };
+
+  const regenerateResponse = async () => {
+    if (!activeConversation || activeConversation.messages.length < 2) return;
+    const messages = activeConversation.messages;
+    const lastUserMsg = messages[messages.length - 2];
+    if (lastUserMsg.role !== 'user') return;
+    
+    const updatedMessages = messages.slice(0, -1);
+    const updatedConv = { ...activeConversation, messages: updatedMessages };
+    setActiveConversation(updatedConv);
+    setConversations(prev => prev.map(conv => 
+      conv.id === updatedConv.id ? updatedConv : conv
+    ));
+
+    const aiResponse = await callAPI(lastUserMsg.content, updatedConv.id);
+    const aiMsg = {
+      id: Date.now().toString(),
+      role: 'assistant',
+      content: aiResponse,
+      timestamp: new Date()
+    };
+    const finalConv = { ...updatedConv, messages: [...updatedMessages, aiMsg] };
+    setConversations(prev => prev.map(conv => 
+      conv.id === finalConv.id ? finalConv : conv
+    ));
+    setActiveConversation(finalConv);
   };
 
   const renderMessageContent = (content) => {
@@ -208,7 +274,7 @@ const App = () => {
       
       return (
         <div>
-          {beforeImage && <div style={{ marginBottom: '12px' }}>{formatText(beforeImage)}</div>}
+          {beforeImage && <div style={{ marginBottom: '12px' }}><ReactMarkdown>{beforeImage}</ReactMarkdown></div>}
           <div className="generated-image" style={{ marginTop: '15px', marginBottom: '15px' }}>
             <img 
               src={imageUrl}
@@ -264,12 +330,36 @@ const App = () => {
               </button>
             </div>
           </div>
-          {afterImage && <div style={{ marginTop: '12px' }}>{formatText(afterImage)}</div>}
+          {afterImage && <div style={{ marginTop: '12px' }}><ReactMarkdown>{afterImage}</ReactMarkdown></div>}
         </div>
       );
     }
     
-    return formatText(content);
+    return (
+      <ReactMarkdown
+        components={{
+          code({node, inline, className, children, ...props}) {
+            const match = /language-(\w+)/.exec(className || '');
+            return !inline && match ? (
+              <SyntaxHighlighter
+                style={vscDarkPlus}
+                language={match[1]}
+                PreTag="div"
+                {...props}
+              >
+                {String(children).replace(/\n$/, '')}
+              </SyntaxHighlighter>
+            ) : (
+              <code className={className} {...props}>
+                {children}
+              </code>
+            );
+          }
+        }}
+      >
+        {content}
+      </ReactMarkdown>
+    );
   };
 
   const filteredConversations = conversations.filter(conv =>
@@ -288,7 +378,7 @@ const App = () => {
   ];
 
   return (
-    <div className="app">
+    <div className={`app ${theme}`}>
       {/* Sidebar */}
       <div className={`sidebar ${sidebarOpen ? 'open' : 'closed'}`}>
         <div className="sidebar-header">
@@ -349,11 +439,50 @@ const App = () => {
             <h1>ChatX</h1>
           </div>
           {activeConversation && (
-            <div className="message-count">
-              {activeConversation.messages.length} messages
+            <div className="header-actions">
+              <div className="message-count">
+                {activeConversation.messages.length} messages
+              </div>
+              <button onClick={exportChat} className="export-btn" title="Export chat">
+                ⬇️
+              </button>
+              <button onClick={clearChat} className="clear-btn" title="Clear chat">
+                🗑️
+              </button>
+              <button onClick={regenerateResponse} className="regen-btn" title="Regenerate last response">
+                🔄
+              </button>
+              <button onClick={toggleTheme} className="theme-btn" title="Toggle theme">
+                {theme === 'dark' ? '☀️' : '🌙'}
+              </button>
+              <button onClick={() => setShowSearch(!showSearch)} className="search-chat-btn" title="Search in chat">
+                🔍
+              </button>
             </div>
           )}
         </div>
+
+        {/* Error Banner */}
+        {error && (
+          <div className="error-banner">
+            <span>⚠️ {error}</span>
+            <button onClick={() => setError(null)}>×</button>
+          </div>
+        )}
+
+        {/* Search Bar */}
+        {showSearch && activeConversation && (
+          <div className="search-in-chat">
+            <input
+              type="text"
+              placeholder="Search in this chat..."
+              value={searchInChat}
+              onChange={(e) => setSearchInChat(e.target.value)}
+              className="search-chat-input"
+            />
+            <button onClick={() => { setSearchInChat(''); setShowSearch(false); }}>×</button>
+          </div>
+        )}
 
         {/* Messages */}
         <div className="messages-container">
@@ -380,7 +509,9 @@ const App = () => {
             </div>
           ) : (
             <div className="messages">
-              {activeConversation.messages.map((msg) => (
+              {activeConversation.messages
+                .filter(msg => !searchInChat || msg.content.toLowerCase().includes(searchInChat.toLowerCase()))
+                .map((msg) => (
                 <div key={msg.id} className={`message ${msg.role}`}>
                   <div className="message-avatar">
                     {msg.role === 'user' ? '👤' : '🤖'}
@@ -389,8 +520,19 @@ const App = () => {
                     <div className="message-text">
                       {renderMessageContent(msg.content)}
                     </div>
-                    <div className="message-time">
-                      {new Date(msg.timestamp).toLocaleTimeString()}
+                    <div className="message-footer">
+                      <div className="message-time">
+                        {new Date(msg.timestamp).toLocaleTimeString()}
+                      </div>
+                      {msg.role === 'assistant' && (
+                        <button 
+                          className="copy-btn-msg"
+                          onClick={() => copyToClipboard(msg.content)}
+                          title="Copy message"
+                        >
+                          📋
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -405,6 +547,7 @@ const App = () => {
                       <span></span>
                       <span></span>
                     </div>
+                    <div className="typing-text">AI is thinking...</div>
                   </div>
                 </div>
               )}
@@ -419,9 +562,9 @@ const App = () => {
             <textarea
               ref={textareaRef}
               value={message}
-              onChange={(e) => setMessage(e.target.value)}
+              onChange={handleTextareaChange}
               onKeyPress={handleKeyPress}
-              placeholder="Message ChatX..."
+              placeholder="Message ChatX... (Shift+Enter for new line)"
               className="message-input"
               rows="1"
             />
