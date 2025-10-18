@@ -26,6 +26,7 @@ const App = () => {
   const [userAvatar, setUserAvatar] = useState('👤');
   const [showTemplates, setShowTemplates] = useState(false);
   const [editingMessage, setEditingMessage] = useState(null);
+  const [showMoreActions, setShowMoreActions] = useState(false);
 
   useEffect(() => {
     const savedTheme = localStorage.getItem('chatx-theme') || 'dark';
@@ -404,6 +405,7 @@ const App = () => {
       if (e.key === 'Escape') {
         setShowShortcuts(false);
         setShowTemplates(false);
+        setShowMoreActions(false);
       }
     };
     window.addEventListener('keydown', handleKeyboard);
@@ -604,6 +606,53 @@ const App = () => {
         </div>
       )}
 
+      {/* More Actions Modal */}
+      {showMoreActions && activeConversation && (
+        <div className="modal-overlay" onClick={() => setShowMoreActions(false)}>
+          <div className="modal actions-modal" onClick={(e) => e.stopPropagation()}>
+            <h2>Chat Actions</h2>
+            <div className="actions-list">
+              <button className="action-item" onClick={() => { exportChat(); setShowMoreActions(false); }}>
+                <span className="action-icon">⬇️</span>
+                <div className="action-content">
+                  <span className="action-title">Export Chat</span>
+                  <span className="action-desc">Download conversation as text file</span>
+                </div>
+              </button>
+              <button className="action-item" onClick={() => { clearChat(); setShowMoreActions(false); }}>
+                <span className="action-icon">🗑️</span>
+                <div className="action-content">
+                  <span className="action-title">Clear Chat</span>
+                  <span className="action-desc">Remove all messages from this conversation</span>
+                </div>
+              </button>
+              <button className="action-item" onClick={() => { regenerateResponse(); setShowMoreActions(false); }}>
+                <span className="action-icon">🔄</span>
+                <div className="action-content">
+                  <span className="action-title">Regenerate Response</span>
+                  <span className="action-desc">Get a new response for the last message</span>
+                </div>
+              </button>
+              <button className="action-item" onClick={() => { generateSummary(); setShowMoreActions(false); }}>
+                <span className="action-icon">📊</span>
+                <div className="action-content">
+                  <span className="action-title">Generate Summary</span>
+                  <span className="action-desc">Create a summary of this conversation</span>
+                </div>
+              </button>
+              <button className="action-item" onClick={() => { shareConversation(); setShowMoreActions(false); }}>
+                <span className="action-icon">🔗</span>
+                <div className="action-content">
+                  <span className="action-title">Share Conversation</span>
+                  <span className="action-desc">Share this conversation with others</span>
+                </div>
+              </button>
+            </div>
+            <button className="modal-close" onClick={() => setShowMoreActions(false)}>×</button>
+          </div>
+        </div>
+      )}
+
       {/* Sidebar */}
       <div className={`sidebar ${sidebarOpen ? 'open' : 'closed'}`}>
         <div className="sidebar-header">
@@ -656,35 +705,25 @@ const App = () => {
       <div className="main-area">
         {/* Header */}
         <div className="header">
-          <button onClick={() => setSidebarOpen(!sidebarOpen)} className="menu-btn">
-            ☰
-          </button>
-          <div className="app-title">
-            <span className="sparkle">✨</span>
-            <h1>ChatX</h1>
+          <div className="header-left">
+            <button onClick={() => setSidebarOpen(!sidebarOpen)} className="menu-btn">
+              ☰
+            </button>
+            <div className="app-title">
+              <span className="sparkle">✨</span>
+              <h1>ChatX</h1>
+            </div>
           </div>
           {activeConversation && (
-            <div className="header-actions">
-              <div className="message-count">
-                {activeConversation.messages.length} messages
-              </div>
-              <button onClick={exportChat} className="export-btn" title="Export chat">
-                ⬇️
-              </button>
-              <button onClick={clearChat} className="clear-btn" title="Clear chat">
-                🗑️
-              </button>
-              <button onClick={regenerateResponse} className="regen-btn" title="Regenerate last response">
-                🔄
-              </button>
+            <div className="header-right">
               <button onClick={toggleTheme} className="theme-btn" title="Toggle theme">
                 {theme === 'dark' ? '☀️' : '🌙'}
               </button>
               <button onClick={() => setShowSearch(!showSearch)} className="search-chat-btn" title="Search in chat">
                 🔍
               </button>
-              <button onClick={() => setShowShortcuts(true)} className="help-btn" title="Help & Shortcuts">
-                ❓
+              <button onClick={() => setShowMoreActions(true)} className="more-actions-btn" title="More actions">
+                ⋮
               </button>
             </div>
           )}
@@ -801,12 +840,6 @@ const App = () => {
             </button>
             <button onClick={startVoiceInput} className={`action-btn ${isListening ? 'active' : ''}`} title="Voice input">
               {isListening ? '🔴' : '🎤'}
-            </button>
-            <button onClick={generateSummary} className="action-btn" title="Generate summary">
-              📊
-            </button>
-            <button onClick={shareConversation} className="action-btn" title="Share">
-              🔗
             </button>
           </div>
           <div className="input-container">
