@@ -15,6 +15,17 @@ const App = () => {
   const [theme, setTheme] = useState('dark');
   const [searchInChat, setSearchInChat] = useState('');
   const [showSearch, setShowSearch] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [pinnedMessages, setPinnedMessages] = useState([]);
+  const [reactions, setReactions] = useState({});
+  const [tags, setTags] = useState({});
+  const [showShortcuts, setShowShortcuts] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [typingEffect, setTypingEffect] = useState(true);
+  const [userAvatar, setUserAvatar] = useState('👤');
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [editingMessage, setEditingMessage] = useState(null);
 
   useEffect(() => {
     const savedTheme = localStorage.getItem('chatx-theme') || 'dark';
@@ -204,10 +215,21 @@ const App = () => {
   };
 
   const handleTextareaChange = (e) => {
-    setMessage(e.target.value);
+    const value = e.target.value;
+    setMessage(value);
     e.target.style.height = 'auto';
     e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
+    if (activeConversation) {
+      localStorage.setItem(`draft-${activeConversation.id}`, value);
+    }
   };
+
+  useEffect(() => {
+    if (activeConversation) {
+      const savedDraft = localStorage.getItem(`draft-${activeConversation.id}`);
+      if (savedDraft) setMessage(savedDraft);
+    }
+  }, [activeConversation?.id]);
 
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text);
@@ -262,6 +284,131 @@ const App = () => {
     ));
     setActiveConversation(finalConv);
   };
+
+  const startVoiceInput = () => {
+    if (!('webkitSpeechRecognition' in window)) {
+      alert('Voice input not supported in this browser');
+      return;
+    }
+    const recognition = new window.webkitSpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.onstart = () => setIsListening(true);
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      setMessage(transcript);
+      setIsListening(false);
+    };
+    recognition.onerror = () => setIsListening(false);
+    recognition.onend = () => setIsListening(false);
+    recognition.start();
+  };
+
+  const speakText = (text) => {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.onstart = () => setIsSpeaking(true);
+      utterance.onend = () => setIsSpeaking(false);
+      window.speechSynthesis.speak(utterance);
+    }
+  };
+
+  const stopSpeaking = () => {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+    }
+  };
+
+  const toggleReaction = (msgId, reaction) => {
+    setReactions(prev => ({
+      ...prev,
+      [msgId]: prev[msgId] === reaction ? null : reaction
+    }));
+  };
+
+  const togglePin = (msgId) => {
+    setPinnedMessages(prev => 
+      prev.includes(msgId) ? prev.filter(id => id !== msgId) : [...prev, msgId]
+    );
+  };
+
+  const editMessage = (msgId, newContent) => {
+    if (!activeConversation) return;
+    const updatedMessages = activeConversation.messages.map(msg =>
+      msg.id === msgId ? { ...msg, content: newContent, edited: true } : msg
+    );
+    const updatedConv = { ...activeConversation, messages: updatedMessages };
+    setActiveConversation(updatedConv);
+    setConversations(prev => prev.map(conv => 
+      conv.id === updatedConv.id ? updatedConv : conv
+    ));
+    setEditingMessage(null);
+  };
+
+  const addTag = (convId, tag) => {
+    setTags(prev => ({
+      ...prev,
+      [convId]: [...(prev[convId] || []), tag]
+    }));
+  };
+
+  const removeTag = (convId, tag) => {
+    setTags(prev => ({
+      ...prev,
+      [convId]: (prev[convId] || []).filter(t => t !== tag)
+    }));
+  };
+
+  const getRelativeTime = (timestamp) => {
+    const now = new Date();
+    const diff = now - new Date(timestamp);
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
+    if (minutes < 1) return 'Just now';
+    if (minutes < 60) return `${minutes}m ago`;
+    if (hours < 24) return `${hours}h ago`;
+    if (days < 7) return `${days}d ago`;
+    return new Date(timestamp).toLocaleDateString();
+  };
+
+  const generateSummary = () => {
+    if (!activeConversation || activeConversation.messages.length === 0) return;
+    const summary = `Chat Summary: ${activeConversation.messages.length} messages exchanged about ${activeConversation.title}`;
+    alert(summary);
+  };
+
+  const shareConversation = () => {
+    if (!activeConversation) return;
+    const shareData = {
+      title: activeConversation.title,
+      text: `Check out this conversation: ${activeConversation.title}`,
+      url: window.location.href
+    };
+    if (navigator.share) {
+      navigator.share(shareData);
+    } else {
+      navigator.clipboard.writeText(window.location.href);
+      alert('Link copied to clipboard!');
+    }
+  };
+
+  useEffect(() => {
+    const handleKeyboard = (e) => {
+      if (e.ctrlKey && e.key === 'k') {
+        e.preventDefault();
+        setShowShortcuts(true);
+      }
+      if (e.key === 'Escape') {
+        setShowShortcuts(false);
+        setShowTemplates(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyboard);
+    return () => window.removeEventListener('keydown', handleKeyboard);
+  }, []);
 
   const renderMessageContent = (content) => {
     if (content.includes('[IMAGE_GENERATED:')) {
@@ -377,8 +524,86 @@ const App = () => {
     "Provide investment advice"
   ];
 
+  const templates = [
+    { title: 'Code Review', prompt: 'Review this code for bugs, security issues, and improvements:\n\n[Paste your code here]' },
+    { title: 'Email Writer', prompt: 'Write a professional email about: [topic]' },
+    { title: 'Business Plan', prompt: 'Create a comprehensive business plan for: [business idea]' },
+    { title: 'Content Creator', prompt: 'Write engaging content about: [topic] for [platform]' },
+    { title: 'Data Analysis', prompt: 'Analyze this data and provide insights:\n\n[Paste data here]' },
+    { title: 'Problem Solver', prompt: 'Help me solve this problem: [describe problem]' }
+  ];
+
+  const requestNotificationPermission = () => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  };
+
+  const showNotification = (title, body) => {
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification(title, { body, icon: '/favicon.ico' });
+    }
+  };
+
+  useEffect(() => {
+    requestNotificationPermission();
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/service-worker.js');
+    }
+  }, []);
+
   return (
     <div className={`app ${theme}`}>
+      {/* Templates Modal */}
+      {showTemplates && (
+        <div className="modal-overlay" onClick={() => setShowTemplates(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h2>Conversation Templates</h2>
+            <div className="templates-grid">
+              {templates.map((template, idx) => (
+                <div key={idx} className="template-card" onClick={() => {
+                  setMessage(template.prompt);
+                  setShowTemplates(false);
+                  textareaRef.current?.focus();
+                }}>
+                  <h3>{template.title}</h3>
+                  <p>{template.prompt.substring(0, 60)}...</p>
+                </div>
+              ))}
+            </div>
+            <button className="modal-close" onClick={() => setShowTemplates(false)}>×</button>
+          </div>
+        </div>
+      )}
+
+      {/* Keyboard Shortcuts Modal */}
+      {showShortcuts && (
+        <div className="modal-overlay" onClick={() => setShowShortcuts(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h2>Keyboard Shortcuts</h2>
+            <div className="shortcuts-list">
+              <div className="shortcut-item">
+                <kbd>Ctrl</kbd> + <kbd>K</kbd>
+                <span>Show shortcuts</span>
+              </div>
+              <div className="shortcut-item">
+                <kbd>Enter</kbd>
+                <span>Send message</span>
+              </div>
+              <div className="shortcut-item">
+                <kbd>Shift</kbd> + <kbd>Enter</kbd>
+                <span>New line</span>
+              </div>
+              <div className="shortcut-item">
+                <kbd>Esc</kbd>
+                <span>Close modals</span>
+              </div>
+            </div>
+            <button className="modal-close" onClick={() => setShowShortcuts(false)}>×</button>
+          </div>
+        </div>
+      )}
+
       {/* Sidebar */}
       <div className={`sidebar ${sidebarOpen ? 'open' : 'closed'}`}>
         <div className="sidebar-header">
@@ -458,6 +683,9 @@ const App = () => {
               <button onClick={() => setShowSearch(!showSearch)} className="search-chat-btn" title="Search in chat">
                 🔍
               </button>
+              <button onClick={() => setShowShortcuts(true)} className="help-btn" title="Help & Shortcuts">
+                ❓
+              </button>
             </div>
           )}
         </div>
@@ -522,17 +750,26 @@ const App = () => {
                     </div>
                     <div className="message-footer">
                       <div className="message-time">
-                        {new Date(msg.timestamp).toLocaleTimeString()}
+                        {getRelativeTime(msg.timestamp)} {msg.edited && '(edited)'}
                       </div>
-                      {msg.role === 'assistant' && (
-                        <button 
-                          className="copy-btn-msg"
-                          onClick={() => copyToClipboard(msg.content)}
-                          title="Copy message"
-                        >
-                          📋
+                      <div className="message-actions">
+                        {msg.role === 'assistant' && (
+                          <>
+                            <button className="msg-action-btn" onClick={() => speakText(msg.content)} title="Read aloud">
+                              {isSpeaking ? '🔊' : '🔈'}
+                            </button>
+                            <button className="msg-action-btn" onClick={() => copyToClipboard(msg.content)} title="Copy">
+                              📋
+                            </button>
+                          </>
+                        )}
+                        <button className="msg-action-btn" onClick={() => togglePin(msg.id)} title="Pin">
+                          {pinnedMessages.includes(msg.id) ? '📌' : '📍'}
                         </button>
-                      )}
+                        <button className="msg-action-btn" onClick={() => toggleReaction(msg.id, 'like')} title="Like">
+                          {reactions[msg.id] === 'like' ? '👍' : '👎'}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -558,6 +795,20 @@ const App = () => {
 
         {/* Input Area */}
         <div className="input-area">
+          <div className="input-actions">
+            <button onClick={() => setShowTemplates(!showTemplates)} className="action-btn" title="Templates">
+              📝
+            </button>
+            <button onClick={startVoiceInput} className={`action-btn ${isListening ? 'active' : ''}`} title="Voice input">
+              {isListening ? '🔴' : '🎤'}
+            </button>
+            <button onClick={generateSummary} className="action-btn" title="Generate summary">
+              📊
+            </button>
+            <button onClick={shareConversation} className="action-btn" title="Share">
+              🔗
+            </button>
+          </div>
           <div className="input-container">
             <textarea
               ref={textareaRef}
