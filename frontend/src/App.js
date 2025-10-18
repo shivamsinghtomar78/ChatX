@@ -100,6 +100,20 @@ const App = () => {
     scrollToBottom();
   }, [activeConversation?.messages]);
 
+  // Add new state variables for enhanced UX
+  const [isFocused, setIsFocused] = useState(false);
+  const [showToast, setShowToast] = useState({ show: false, message: '', type: '' });
+  const [isSidebarResizing, setIsSidebarResizing] = useState(false);
+  const sidebarRef = useRef(null);
+
+  // Add toast notification function
+  const showToastMessage = (message, type = 'info') => {
+    setShowToast({ show: true, message, type });
+    setTimeout(() => {
+      setShowToast({ show: false, message: '', type: '' });
+    }, 3000);
+  };
+
   const createNewConversation = () => {
     const newConv = {
       id: Date.now().toString(),
@@ -109,12 +123,14 @@ const App = () => {
     };
     setConversations(prev => [newConv, ...prev]);
     setActiveConversation(newConv);
+    showToastMessage('New conversation created', 'success');
   };
 
   const deleteConversation = (id) => {
     setConversations(prev => prev.filter(conv => conv.id !== id));
     if (activeConversation?.id === id) {
       setActiveConversation(null);
+      showToastMessage('Conversation deleted', 'info');
     }
   };
 
@@ -234,6 +250,7 @@ const App = () => {
 
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text);
+    showToastMessage('Copied to clipboard', 'success');
   };
 
   const exportChat = () => {
@@ -246,8 +263,11 @@ const App = () => {
     const a = document.createElement('a');
     a.href = url;
     a.download = `chat-${activeConversation.title}-${Date.now()}.txt`;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
     URL.revokeObjectURL(url);
+    showToastMessage('Chat exported successfully', 'success');
   };
 
   const clearChat = () => {
@@ -556,24 +576,37 @@ const App = () => {
 
   return (
     <div className={`app ${theme}`}>
+      {/* Toast Notification */}
+      {showToast.show && (
+        <div className={`toast toast-${showToast.type}`}>
+          <span>{showToast.message}</span>
+          <button onClick={() => setShowToast({ show: false, message: '', type: '' })}>×</button>
+        </div>
+      )}
+
       {/* Templates Modal */}
       {showTemplates && (
         <div className="modal-overlay" onClick={() => setShowTemplates(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
+          <div className={`modal ${theme}`} onClick={(e) => e.stopPropagation()}>
             <h2>Conversation Templates</h2>
             <div className="templates-grid">
               {templates.map((template, idx) => (
-                <div key={idx} className="template-card" onClick={() => {
-                  setMessage(template.prompt);
-                  setShowTemplates(false);
-                  textareaRef.current?.focus();
-                }}>
+                <div 
+                  key={idx} 
+                  className={`template-card ${theme}`}
+                  onClick={() => {
+                    setMessage(template.prompt);
+                    setShowTemplates(false);
+                    textareaRef.current?.focus();
+                    showToastMessage('Template applied', 'success');
+                  }}
+                >
                   <h3>{template.title}</h3>
                   <p>{template.prompt.substring(0, 60)}...</p>
                 </div>
               ))}
             </div>
-            <button className="modal-close" onClick={() => setShowTemplates(false)}>×</button>
+            <button className={`modal-close ${theme}`} onClick={() => setShowTemplates(false)}>×</button>
           </div>
         </div>
       )}
@@ -581,27 +614,27 @@ const App = () => {
       {/* Keyboard Shortcuts Modal */}
       {showShortcuts && (
         <div className="modal-overlay" onClick={() => setShowShortcuts(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
+          <div className={`modal ${theme}`} onClick={(e) => e.stopPropagation()}>
             <h2>Keyboard Shortcuts</h2>
-            <div className="shortcuts-list">
-              <div className="shortcut-item">
+            <div className={`shortcuts-list ${theme}`}>
+              <div className={`shortcut-item ${theme}`}>
                 <kbd>Ctrl</kbd> + <kbd>K</kbd>
                 <span>Show shortcuts</span>
               </div>
-              <div className="shortcut-item">
+              <div className={`shortcut-item ${theme}`}>
                 <kbd>Enter</kbd>
                 <span>Send message</span>
               </div>
-              <div className="shortcut-item">
+              <div className={`shortcut-item ${theme}`}>
                 <kbd>Shift</kbd> + <kbd>Enter</kbd>
                 <span>New line</span>
               </div>
-              <div className="shortcut-item">
+              <div className={`shortcut-item ${theme}`}>
                 <kbd>Esc</kbd>
                 <span>Close modals</span>
               </div>
             </div>
-            <button className="modal-close" onClick={() => setShowShortcuts(false)}>×</button>
+            <button className={`modal-close ${theme}`} onClick={() => setShowShortcuts(false)}>×</button>
           </div>
         </div>
       )}
@@ -609,38 +642,38 @@ const App = () => {
       {/* More Actions Modal */}
       {showMoreActions && activeConversation && (
         <div className="modal-overlay" onClick={() => setShowMoreActions(false)}>
-          <div className="modal actions-modal" onClick={(e) => e.stopPropagation()}>
+          <div className={`modal actions-modal ${theme}`} onClick={(e) => e.stopPropagation()}>
             <h2>Chat Actions</h2>
             <div className="actions-list">
-              <button className="action-item" onClick={() => { exportChat(); setShowMoreActions(false); }}>
+              <button className={`action-item ${theme}`} onClick={() => { exportChat(); setShowMoreActions(false); }}>
                 <span className="action-icon">⬇️</span>
                 <div className="action-content">
                   <span className="action-title">Export Chat</span>
                   <span className="action-desc">Download conversation as text file</span>
                 </div>
               </button>
-              <button className="action-item" onClick={() => { clearChat(); setShowMoreActions(false); }}>
+              <button className={`action-item ${theme}`} onClick={() => { clearChat(); setShowMoreActions(false); }}>
                 <span className="action-icon">🗑️</span>
                 <div className="action-content">
                   <span className="action-title">Clear Chat</span>
                   <span className="action-desc">Remove all messages from this conversation</span>
                 </div>
               </button>
-              <button className="action-item" onClick={() => { regenerateResponse(); setShowMoreActions(false); }}>
+              <button className={`action-item ${theme}`} onClick={() => { regenerateResponse(); setShowMoreActions(false); }}>
                 <span className="action-icon">🔄</span>
                 <div className="action-content">
                   <span className="action-title">Regenerate Response</span>
                   <span className="action-desc">Get a new response for the last message</span>
                 </div>
               </button>
-              <button className="action-item" onClick={() => { generateSummary(); setShowMoreActions(false); }}>
+              <button className={`action-item ${theme}`} onClick={() => { generateSummary(); setShowMoreActions(false); }}>
                 <span className="action-icon">📊</span>
                 <div className="action-content">
                   <span className="action-title">Generate Summary</span>
                   <span className="action-desc">Create a summary of this conversation</span>
                 </div>
               </button>
-              <button className="action-item" onClick={() => { shareConversation(); setShowMoreActions(false); }}>
+              <button className={`action-item ${theme}`} onClick={() => { shareConversation(); setShowMoreActions(false); }}>
                 <span className="action-icon">🔗</span>
                 <div className="action-content">
                   <span className="action-title">Share Conversation</span>
@@ -648,13 +681,16 @@ const App = () => {
                 </div>
               </button>
             </div>
-            <button className="modal-close" onClick={() => setShowMoreActions(false)}>×</button>
+            <button className={`modal-close ${theme}`} onClick={() => setShowMoreActions(false)}>×</button>
           </div>
         </div>
       )}
 
       {/* Sidebar */}
-      <div className={`sidebar ${sidebarOpen ? 'open' : 'closed'}`}>
+      <div 
+        className={`sidebar ${sidebarOpen ? 'open' : 'closed'} ${theme}`}
+        ref={sidebarRef}
+      >
         <div className="sidebar-header">
           <button onClick={createNewConversation} className="new-chat-btn">
             + New Chat
@@ -667,7 +703,7 @@ const App = () => {
             placeholder="Search conversations..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="search-input"
+            className={`search-input ${theme}`}
           />
         </div>
 
@@ -702,11 +738,11 @@ const App = () => {
       </div>
 
       {/* Main Chat Area */}
-      <div className="main-area">
+      <div className={`main-area ${theme}`}>
         {/* Header */}
-        <div className="header">
+        <div className={`header ${theme}`}>
           <div className="header-left">
-            <button onClick={() => setSidebarOpen(!sidebarOpen)} className="menu-btn">
+            <button onClick={() => setSidebarOpen(!sidebarOpen)} className={`menu-btn ${theme}`}>
               ☰
             </button>
             <div className="app-title">
@@ -716,13 +752,13 @@ const App = () => {
           </div>
           {activeConversation && (
             <div className="header-right">
-              <button onClick={toggleTheme} className="theme-btn" title="Toggle theme">
+              <button onClick={toggleTheme} className={`theme-btn ${theme}`} title="Toggle theme">
                 {theme === 'dark' ? '☀️' : '🌙'}
               </button>
-              <button onClick={() => setShowSearch(!showSearch)} className="search-chat-btn" title="Search in chat">
+              <button onClick={() => setShowSearch(!showSearch)} className={`search-chat-btn ${theme}`} title="Search in chat">
                 🔍
               </button>
-              <button onClick={() => setShowMoreActions(true)} className="more-actions-btn" title="More actions">
+              <button onClick={() => setShowMoreActions(true)} className={`more-actions-btn ${theme}`} title="More actions">
                 ⋮
               </button>
             </div>
@@ -739,13 +775,13 @@ const App = () => {
 
         {/* Search Bar */}
         {showSearch && activeConversation && (
-          <div className="search-in-chat">
+          <div className={`search-in-chat ${theme}`}>
             <input
               type="text"
               placeholder="Search in this chat..."
               value={searchInChat}
               onChange={(e) => setSearchInChat(e.target.value)}
-              className="search-chat-input"
+              className={`search-chat-input ${theme}`}
             />
             <button onClick={() => { setSearchInChat(''); setShowSearch(false); }}>×</button>
           </div>
@@ -767,7 +803,7 @@ const App = () => {
                       setMessage(suggestion);
                       textareaRef.current?.focus();
                     }}
-                    className="suggestion-card"
+                    className={`suggestion-card ${theme}`}
                   >
                     {suggestion}
                   </button>
@@ -784,7 +820,7 @@ const App = () => {
                     {msg.role === 'user' ? '👤' : '🤖'}
                   </div>
                   <div className="message-content">
-                    <div className="message-text">
+                    <div className={`message-text ${theme}`}>
                       {renderMessageContent(msg.content)}
                     </div>
                     <div className="message-footer">
@@ -794,18 +830,18 @@ const App = () => {
                       <div className="message-actions">
                         {msg.role === 'assistant' && (
                           <>
-                            <button className="msg-action-btn" onClick={() => speakText(msg.content)} title="Read aloud">
+                            <button className={`msg-action-btn ${theme}`} onClick={() => speakText(msg.content)} title="Read aloud">
                               {isSpeaking ? '🔊' : '🔈'}
                             </button>
-                            <button className="msg-action-btn" onClick={() => copyToClipboard(msg.content)} title="Copy">
+                            <button className={`msg-action-btn ${theme}`} onClick={() => copyToClipboard(msg.content)} title="Copy">
                               📋
                             </button>
                           </>
                         )}
-                        <button className="msg-action-btn" onClick={() => togglePin(msg.id)} title="Pin">
+                        <button className={`msg-action-btn ${theme}`} onClick={() => togglePin(msg.id)} title="Pin">
                           {pinnedMessages.includes(msg.id) ? '📌' : '📍'}
                         </button>
-                        <button className="msg-action-btn" onClick={() => toggleReaction(msg.id, 'like')} title="Like">
+                        <button className={`msg-action-btn ${theme}`} onClick={() => toggleReaction(msg.id, 'like')} title="Like">
                           {reactions[msg.id] === 'like' ? '👍' : '👎'}
                         </button>
                       </div>
@@ -833,23 +869,25 @@ const App = () => {
         </div>
 
         {/* Input Area */}
-        <div className="input-area">
+        <div className={`input-area ${theme}`}>
           <div className="input-actions">
-            <button onClick={() => setShowTemplates(!showTemplates)} className="action-btn" title="Templates">
+            <button onClick={() => setShowTemplates(!showTemplates)} className={`action-btn ${theme}`} title="Templates">
               📝
             </button>
-            <button onClick={startVoiceInput} className={`action-btn ${isListening ? 'active' : ''}`} title="Voice input">
+            <button onClick={startVoiceInput} className={`action-btn ${theme} ${isListening ? 'active' : ''}`} title="Voice input">
               {isListening ? '🔴' : '🎤'}
             </button>
           </div>
-          <div className="input-container">
+          <div className={`input-container ${theme} ${isFocused ? 'focused' : ''}`}>
             <textarea
               ref={textareaRef}
               value={message}
               onChange={handleTextareaChange}
               onKeyPress={handleKeyPress}
+              onFocus={() => setIsFocused(true)}
+              onBlur={() => setIsFocused(false)}
               placeholder="Message ChatX... (Shift+Enter for new line)"
-              className="message-input"
+              className={`message-input ${theme}`}
               rows="1"
             />
             <button
