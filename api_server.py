@@ -1,12 +1,19 @@
 from flask import Flask, request, jsonify, send_from_directory, send_file
 from flask_cors import CORS
-from langgraph_tool_backend import chatbot
-from langchain_core.messages import HumanMessage
 import uuid
 import os
 
 app = Flask(__name__)
 CORS(app)
+
+# Lazy load chatbot to prevent startup crashes
+chatbot = None
+def get_chatbot():
+    global chatbot
+    if chatbot is None:
+        from langgraph_tool_backend import chatbot as cb
+        chatbot = cb
+    return chatbot
 
 @app.route('/api/chat', methods=['POST'])
 def chat():
@@ -23,7 +30,9 @@ def chat():
             "run_name": "chat_turn",
         }
         
-        final_state = chatbot.invoke(
+        from langchain_core.messages import HumanMessage
+        cb = get_chatbot()
+        final_state = cb.invoke(
             {"messages": [HumanMessage(content=message)]},
             config=CONFIG
         )
@@ -49,17 +58,26 @@ def health():
 
 @app.route('/static/<path:filename>')
 def serve_static(filename):
-    try:
-        return send_from_directory('frontend/build/static', filename)
-    except:
-        return '', 404
+    static_folder = os.path.join(os.path.dirname(__file__), 'frontend', 'build', 'static')
+    file_path = os.path.join(static_folder, filename)
+    if os.path.exists(file_path):
+        return send_file(file_path)
+    return '', 404
 
 @app.route('/')
 def home():
-    try:
-        return send_file('frontend/build/index.html')
-    except:
-        return '<h1>ChatX API Running</h1>'
+    index_path = os.path.join(os.path.dirname(__file__), 'frontend', 'build', 'index.html')
+    if os.path.exists(index_path):
+        return send_file(index_path)
+    return '<h1>ChatX API Running</h1><p>Frontend build not found</p>'
+
+@app.route('/api/image/<filename>')
+def serve_image(filename):
+    filename = os.path.basename(filename)
+    filepath = os.path.join(os.path.dirname(__file__), 'static', filename)
+    if os.path.exists(filepath):
+        return send_file(filepath)
+    return '', 404
 
 if __name__ == '__main__':
     app.run(debug=False, port=5000)
