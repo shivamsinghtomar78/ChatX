@@ -1,4 +1,4 @@
-# ChatX - AI Chat Interface
+User profile section# ChatX - AI Chat Interface
 
 Modern ChatGPT-style interface with React frontend and LangGraph backend.
 

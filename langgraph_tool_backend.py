@@ -17,9 +17,80 @@ from PIL import Image, ImageDraw, ImageFont
 load_dotenv()
 
 # -------------------
+# API Key Validation
+# -------------------
+def validate_api_keys():
+    """
+    Validate all required API keys at application startup.
+    Returns a dictionary with validation results and error messages.
+    """
+    validation_results = {
+        'GOOGLE_API_KEY': {'valid': False, 'error': None},
+        'FREEPIK_API_KEY': {'valid': False, 'error': None}
+    }
+    
+    # Validate Google API Key
+    google_api_key = os.getenv("GOOGLE_API_KEY")
+    if not google_api_key:
+        validation_results['GOOGLE_API_KEY']['error'] = "GOOGLE_API_KEY not found in environment variables"
+    elif not google_api_key.strip():
+        validation_results['GOOGLE_API_KEY']['error'] = "GOOGLE_API_KEY is empty"
+    else:
+        validation_results['GOOGLE_API_KEY']['valid'] = True
+        validation_results['GOOGLE_API_KEY']['error'] = None
+    
+    # Validate Freepik API Key
+    freepik_api_key = os.getenv("FREEPIK_API_KEY")
+    if not freepik_api_key:
+        validation_results['FREEPIK_API_KEY']['error'] = "FREEPIK_API_KEY not found in environment variables"
+    elif not freepik_api_key.strip():
+        validation_results['FREEPIK_API_KEY']['error'] = "FREEPIK_API_KEY is empty"
+    else:
+        validation_results['FREEPIK_API_KEY']['valid'] = True
+        validation_results['FREEPIK_API_KEY']['error'] = None
+    
+    return validation_results
+
+def print_api_key_validation_results():
+    """
+    Print user-friendly messages about API key validation status.
+    """
+    results = validate_api_keys()
+    
+    print("=" * 50)
+    print("API Key Validation Results")
+    print("=" * 50)
+    
+    for key_name, result in results.items():
+        if result['valid']:
+            print(f"✓ {key_name}: Valid")
+        else:
+            print(f"✗ {key_name}: {result['error']}")
+            print(f"  Please set {key_name} in your .env file")
+    
+    # Overall status
+    all_valid = all(result['valid'] for result in results.values())
+    if all_valid:
+        print("\n✓ All required API keys are properly configured!")
+    else:
+        print("\n⚠️  Some API keys are missing or invalid.")
+        print("   The application will still run but some features may not work properly.")
+    
+    print("=" * 50)
+
+# Run validation at startup
+print_api_key_validation_results()
+
+# -------------------
 # 1. LLM
 # -------------------
-llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash",temperature=0.5)
+# Initialize LLM with error handling
+try:
+    llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", temperature=0.5)
+    print("✓ Google Generative AI LLM initialized successfully")
+except Exception as e:
+    print(f"✗ Failed to initialize Google Generative AI LLM: {e}")
+    print("  Some AI features may not work properly")
 
 # -------------------
 # 2. Tools
@@ -103,26 +174,69 @@ def generate_image(user_prompt: str) -> str:
         filename = os.path.basename(filename)
         filepath = os.path.join(os.getcwd(), "static", filename)
         
-        # Try API call
-        success = try_freepik_generation_enhanced(user_prompt, filepath)
+        print(f"[DEBUG] Generated filename: {filename}")
+        print(f"[DEBUG] Filepath: {filepath}")
+        
+        # Optimize the prompt for better results
+        optimized_prompt = optimize_image_prompt_advanced(user_prompt)
+        print(f"[DEBUG] Optimized prompt: {optimized_prompt[:100]}...")
+        
+        # Try API call with enhanced generation
+        success = generate_with_enhanced_api(optimized_prompt, filepath, user_prompt)
+        print(f"[DEBUG] API call success: {success}")
         
         if success and os.path.exists(filepath):
+            file_size = os.path.getsize(filepath)
+            print(f"[SUCCESS] Image generated successfully. File size: {file_size} bytes")
             return f"I've generated an image for '{user_prompt}'.\n\n[IMAGE_GENERATED:{filename}]"
         
-        # Create simple placeholder if API fails
-        create_simple_placeholder(filepath, user_prompt)
-        return f"I've created an image preview for '{user_prompt}'.\n\n[IMAGE_GENERATED:{filename}]"
+        # Fallback: Create enhanced placeholder if all API attempts fail
+        print(f"[WARNING] API generation failed, creating enhanced placeholder")
+        enhanced_placeholder = create_enhanced_placeholder(filepath, user_prompt, optimized_prompt)
+        if enhanced_placeholder:
+            file_size = os.path.getsize(filepath)
+            print(f"[SUCCESS] Enhanced placeholder created. File size: {file_size} bytes")
+            return f"I've created an enhanced image preview for '{user_prompt}'.\n\n[IMAGE_GENERATED:{filename}]"
+        
+        # Last resort: Create simple placeholder
+        print(f"[WARNING] Enhanced placeholder failed, creating simple placeholder")
+        simple_placeholder = create_simple_placeholder(filepath, user_prompt)
+        if simple_placeholder:
+            file_size = os.path.getsize(filepath)
+            print(f"[SUCCESS] Simple placeholder created. File size: {file_size} bytes")
+            return f"I've created an image preview for '{user_prompt}'.\n\n[IMAGE_GENERATED:{filename}]"
+        
+        # If all fallbacks fail
+        print(f"[ERROR] All image generation methods failed for prompt: {user_prompt}")
+        return "I'm having trouble generating images right now. Please try again later."
             
     except Exception as e:
-        print(f"Image generation error: {e}")
-        # Always create something
+        print(f"[ERROR] Image generation failed with exception: {e}")
+        import traceback
+        print(f"[ERROR] Traceback: {traceback.format_exc()}")
+        # Always create something as a last resort
         try:
             os.makedirs("static", exist_ok=True)
             filename = f"generated_{abs(hash(user_prompt)) % 10000}.png"
-            filepath = os.path.join("static", filename)
-            create_simple_placeholder(filepath, user_prompt)
-            return f"I've created an image preview for '{user_prompt}'.\n\n[IMAGE_GENERATED:{filename}]"
-        except:
+            filepath = os.path.join(os.getcwd(), "static", filename)
+            print(f"[DEBUG] Emergency fallback - filename: {filename}")
+            # Try enhanced placeholder first
+            if create_enhanced_placeholder(filepath, user_prompt, user_prompt):
+                file_size = os.path.getsize(filepath)
+                print(f"[SUCCESS] Emergency enhanced placeholder created. File size: {file_size} bytes")
+                return f"I've created an enhanced image preview for '{user_prompt}'.\n\n[IMAGE_GENERATED:{filename}]"
+            # Fallback to simple placeholder
+            elif create_simple_placeholder(filepath, user_prompt):
+                file_size = os.path.getsize(filepath)
+                print(f"[SUCCESS] Emergency simple placeholder created. File size: {file_size} bytes")
+                return f"I've created an image preview for '{user_prompt}'.\n\n[IMAGE_GENERATED:{filename}]"
+            else:
+                print(f"[ERROR] All emergency fallbacks failed for prompt: {user_prompt}")
+                return "I'm having trouble generating images right now. Please try again later."
+        except Exception as fallback_error:
+            print(f"[CRITICAL] Image generation fallback error: {fallback_error}")
+            import traceback
+            print(f"[CRITICAL] Fallback traceback: {traceback.format_exc()}")
             return "I'm having trouble generating images right now. Please try again later."
 
 def optimize_image_prompt_advanced(user_input: str) -> str:
@@ -220,7 +334,7 @@ def detect_image_style(prompt: str) -> str:
     
     return "realistic"
 
-def generate_with_enhanced_api(optimized_prompt: str, filepath: str, original_prompt: str) -> str:
+def generate_with_enhanced_api(optimized_prompt: str, filepath: str, original_prompt: str) -> str | None:
     """Generate image using multiple API attempts with fallback"""
     try:
         print("[INFO] Attempting Freepik API generation...")
@@ -252,7 +366,16 @@ def try_openai_generation(prompt: str, filepath: str) -> str:
     """Try OpenAI DALL-E API"""
     try:
         openai_key = os.getenv("OPENAI_API_KEY")
+        
+        # Check if API key is available and valid
         if not openai_key:
+            print("[WARNING] OpenAI API key not found in environment variables.")
+            print("  Please set OPENAI_API_KEY in your .env file to enable OpenAI image generation.")
+            print("  Visit https://platform.openai.com to get your API key.")
+            return None
+        elif not openai_key.strip():
+            print("[WARNING] OpenAI API key is empty.")
+            print("  Please set a valid OPENAI_API_KEY in your .env file.")
             return None
             
         import openai
@@ -274,12 +397,35 @@ def try_openai_generation(prompt: str, filepath: str) -> str:
         
     except Exception as e:
         print(f"OpenAI generation failed: {e}")
+        # Provide specific error messages based on common issues
+        error_str = str(e).lower()
+        if "authentication" in error_str or "api key" in error_str:
+            print("  Please check your OPENAI_API_KEY in your .env file.")
+            print("  Visit https://platform.openai.com to get a valid API key.")
+        elif "rate limit" in error_str:
+            print("  OpenAI rate limit exceeded. Please wait before making more requests.")
+        elif "invalid_request" in error_str:
+            print("  Invalid request to OpenAI API. Please check your prompt.")
         return None
 
-def try_freepik_generation_enhanced(prompt: str, filepath: str) -> str:
+def try_freepik_generation_enhanced(prompt: str, filepath: str) -> str | None:
     """Enhanced Freepik API generation with better error handling"""
     try:
+        print(f"[DEBUG] Attempting Freepik generation with prompt: {prompt[:50]}...")
+        print(f"[DEBUG] Target filepath: {filepath}")
+        
         FREEPIK_API_KEY = os.getenv("FREEPIK_API_KEY")
+        
+        # Check if API key is available and valid
+        if not FREEPIK_API_KEY:
+            print("[WARNING] Freepik API key not found in environment variables.")
+            print("  Please set FREEPIK_API_KEY in your .env file to enable image generation.")
+            print("  Visit https://freepik.com to get your API key.")
+            return None
+        elif not FREEPIK_API_KEY.strip():
+            print("[WARNING] Freepik API key is empty.")
+            print("  Please set a valid FREEPIK_API_KEY in your .env file.")
+            return None
         
         headers = {
             "X-Freepik-API-Key": FREEPIK_API_KEY,
@@ -313,47 +459,111 @@ def try_freepik_generation_enhanced(prompt: str, filepath: str) -> str:
         print(f"[INFO] Main prompt: {main_prompt[:100]}...")
         
         response = requests.post(url, headers=headers, json=payload, timeout=90)
-        print(f"[INFO] API Response: {response.status_code}")
+        print(f"[INFO] API Response Status: {response.status_code}")
+        
+        # Log response headers for debugging
+        print(f"[DEBUG] Response headers: {dict(response.headers)}")
         
         if response.status_code == 200:
-            data = response.json()
+            try:
+                data = response.json()
+                print(f"[DEBUG] Response data keys: {list(data.keys()) if isinstance(data, dict) else 'Not a dict'}")
+            except Exception as json_e:
+                print(f"[ERROR] Failed to parse JSON response: {json_e}")
+                print(f"[DEBUG] Response text: {response.text[:500]}...")
+                return None
             
             if "data" in data and len(data["data"]) > 0:
                 image_info = data["data"][0]
+                print(f"[DEBUG] Image info keys: {list(image_info.keys()) if isinstance(image_info, dict) else 'Not a dict'}")
                 
                 # Handle base64 response
                 if "base64" in image_info:
                     import base64
                     try:
+                        print("[INFO] Processing base64 image response...")
                         image_data = base64.b64decode(image_info["base64"])
                         with open(filepath, "wb") as f:
                             f.write(image_data)
-                        print(f"[SUCCESS] Image saved successfully: {filepath}")
+                        file_size = os.path.getsize(filepath)
+                        print(f"[SUCCESS] Image saved successfully: {filepath} ({file_size} bytes)")
                         return filepath
                     except Exception as e:
-                        print(f"[ERROR] Failed to save image: {e}")
+                        print(f"[ERROR] Failed to save image from base64: {e}")
+                        import traceback
+                        print(f"[ERROR] Base64 save traceback: {traceback.format_exc()}")
                         return None
                     
                 # Handle URL response
                 elif "url" in image_info:
                     image_url = image_info["url"]
-                    img_response = requests.get(image_url, timeout=45)
-                    if img_response.status_code == 200:
-                        with open(filepath, "wb") as f:
-                            f.write(img_response.content)
-                        print(f"[SUCCESS] Image downloaded successfully: {filepath}")
-                        return filepath
+                    try:
+                        print(f"[INFO] Downloading image from URL: {image_url[:100]}...")
+                        img_response = requests.get(image_url, timeout=45)
+                        print(f"[DEBUG] Image download status: {img_response.status_code}")
+                        if img_response.status_code == 200:
+                            with open(filepath, "wb") as f:
+                                f.write(img_response.content)
+                            file_size = os.path.getsize(filepath)
+                            print(f"[SUCCESS] Image downloaded successfully: {filepath} ({file_size} bytes)")
+                            return filepath
+                        else:
+                            print(f"[ERROR] Failed to download image from URL. Status: {img_response.status_code}")
+                            print(f"[DEBUG] Response headers: {dict(img_response.headers)}")
+                            if img_response.text:
+                                print(f"[DEBUG] Response text: {img_response.text[:300]}...")
+                            return None
+                    except Exception as e:
+                        print(f"[ERROR] Failed to download image from URL: {e}")
+                        import traceback
+                        print(f"[ERROR] Download traceback: {traceback.format_exc()}")
+                        return None
+                else:
+                    print("[ERROR] Unexpected response format from Freepik API")
+                    print(f"[DEBUG] Image info content: {image_info}")
+                    return None
+            else:
+                print("[ERROR] No image data in Freepik API response")
+                print(f"[DEBUG] Response data: {data}")
+                return None
         
-        # Log detailed error for debugging
-        error_msg = response.text[:300] if response.text else "No response text"
-        print(f"[ERROR] Freepik API failed - Status: {response.status_code}, Error: {error_msg}")
-        return None
+        # Handle API errors
+        elif response.status_code == 401:
+            print("[ERROR] Freepik API authentication failed - Invalid API key")
+            print("  Please check your FREEPIK_API_KEY in your .env file.")
+            print("  Visit https://freepik.com to get a valid API key.")
+            return None
+        elif response.status_code == 403:
+            print("[ERROR] Freepik API access forbidden - Insufficient permissions")
+            print("  Please check your Freepik account and API key permissions.")
+            return None
+        elif response.status_code == 429:
+            print("[ERROR] Freepik API rate limit exceeded")
+            print("  Please wait before making more requests or upgrade your plan.")
+            return None
+        elif response.status_code >= 500:
+            print(f"[ERROR] Freepik API server error (Status: {response.status_code})")
+            print("  This is a temporary issue with Freepik's servers. Please try again later.")
+            return None
+        else:
+            # Log detailed error for debugging
+            error_msg = response.text[:500] if response.text else "No response text"
+            print(f"[ERROR] Freepik API request failed - Status: {response.status_code}, Error: {error_msg}")
+            return None
         
     except requests.exceptions.Timeout:
         print("[ERROR] Freepik API timeout - server took too long to respond")
+        print("  Please check your internet connection and try again.")
+        return None
+    except requests.exceptions.RequestException as e:
+        print(f"[ERROR] Freepik API network error: {e}")
+        import traceback
+        print(f"[ERROR] Network error traceback: {traceback.format_exc()}")
         return None
     except Exception as e:
-        print(f"[ERROR] Freepik API error: {str(e)}")
+        print(f"[ERROR] Freepik API unexpected error: {str(e)}")
+        import traceback
+        print(f"[ERROR] Unexpected error traceback: {traceback.format_exc()}")
         return None
 
 def simplify_prompt_for_api(original_prompt: str) -> str:
@@ -378,16 +588,20 @@ def simplify_prompt_for_api(original_prompt: str) -> str:
     
     return simplified_prompt
 
-def create_simple_placeholder(filepath: str, prompt: str) -> str:
+def create_simple_placeholder(filepath: str, prompt: str) -> str | None:
     """Create a simple placeholder image"""
     try:
+        print(f"[DEBUG] Creating simple placeholder for prompt: {prompt[:50]}...")
+        print(f"[DEBUG] Target filepath: {filepath}")
+        
         img = Image.new('RGB', (512, 512), color=(240, 240, 240))
         draw = ImageDraw.Draw(img)
         
         try:
             font = ImageFont.truetype("arial.ttf", 24)
             small_font = ImageFont.truetype("arial.ttf", 16)
-        except:
+        except Exception as font_e:
+            print(f"[WARNING] Could not load TrueType fonts: {font_e}")
             font = ImageFont.load_default()
             small_font = ImageFont.load_default()
         
@@ -413,30 +627,44 @@ def create_simple_placeholder(filepath: str, prompt: str) -> str:
         draw.rectangle([100, 200, 412, 350], fill=(220, 220, 220), outline=(150, 150, 150), width=2)
         draw.text((180, 260), "Image Preview", fill=(100, 100, 100), font=font)
         
+        # Ensure directory exists
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)
+        
         img.save(filepath, 'PNG')
-        print(f"[SUCCESS] Simple placeholder created: {filepath}")
+        file_size = os.path.getsize(filepath)
+        print(f"[SUCCESS] Simple placeholder created: {filepath} ({file_size} bytes)")
         return filepath
         
     except Exception as e:
-        print(f"Failed to create simple placeholder: {e}")
+        print(f"[ERROR] Failed to create simple placeholder: {e}")
+        import traceback
+        print(f"[ERROR] Simple placeholder traceback: {traceback.format_exc()}")
         return None
 
-def create_enhanced_placeholder(filepath: str, original_prompt: str, optimized_prompt: str) -> str:
+def create_enhanced_placeholder(filepath: str, original_prompt: str, optimized_prompt: str) -> str | None:
     """Create enhanced placeholder with professional styling and preview"""
     try:
+        print(f"[DEBUG] Creating enhanced placeholder for prompt: {original_prompt[:50]}...")
+        print(f"[DEBUG] Target filepath: {filepath}")
+        
+        # Ensure directory exists
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)
+        
         # Create high-quality placeholder with enhanced design
         img = Image.new('RGB', (1024, 1024), color=(248, 250, 252))
         draw = ImageDraw.Draw(img)
         
         # Detect style for appropriate styling
         style = detect_image_style(original_prompt)
+        print(f"[DEBUG] Detected style: {style}")
         
         # Load fonts
         try:
             title_font = ImageFont.truetype("arial.ttf", 36)
             subtitle_font = ImageFont.truetype("arial.ttf", 24)
             body_font = ImageFont.truetype("arial.ttf", 18)
-        except:
+        except Exception as font_e:
+            print(f"[WARNING] Could not load TrueType fonts: {font_e}")
             title_font = ImageFont.load_default()
             subtitle_font = ImageFont.load_default()
             body_font = ImageFont.load_default()
@@ -556,12 +784,23 @@ def create_enhanced_placeholder(filepath: str, original_prompt: str, optimized_p
         
         # Save with high quality
         img.save(filepath, 'PNG', quality=95, optimize=True)
-        print(f"[SUCCESS] Enhanced placeholder created: {filepath}")
+        file_size = os.path.getsize(filepath)
+        print(f"[SUCCESS] Enhanced placeholder created: {filepath} ({file_size} bytes)")
         return filepath
         
     except Exception as e:
-        print(f"Failed to create professional placeholder: {e}")
-        return None
+        print(f"[ERROR] Failed to create enhanced placeholder: {e}")
+        import traceback
+        print(f"[ERROR] Enhanced placeholder traceback: {traceback.format_exc()}")
+        # Try to create a simple fallback
+        try:
+            print("[INFO] Attempting simple placeholder as fallback...")
+            return create_simple_placeholder(filepath, original_prompt)
+        except Exception as fallback_e:
+            print(f"[ERROR] Fallback to simple placeholder also failed: {fallback_e}")
+            import traceback
+            print(f"[ERROR] Fallback traceback: {traceback.format_exc()}")
+            return None
 
 @tool
 def code_analyzer(code: str, language: str = "python") -> str:
@@ -762,6 +1001,7 @@ Phase 1: Planning (Weeks 1-2)
 Phase 2: Execution (Weeks 3-8)
 - Development/Implementation
 - Regular check-ins
+
 - Quality assurance
 - Progress tracking
 
@@ -1374,22 +1614,27 @@ def optimize_image_prompt(user_input: str) -> str:
     """Legacy function - redirects to advanced version"""
     return optimize_image_prompt_advanced(user_input)
 
-def try_freepik_generation(prompt: str, filepath: str) -> str:
+def try_freepik_generation(prompt: str, filepath: str) -> str | None:
     """Legacy function - redirects to enhanced version"""
     return try_freepik_generation_enhanced(prompt, filepath)
 
-def create_professional_placeholder(filepath: str, prompt: str) -> str:
+def create_professional_placeholder(filepath: str, prompt: str) -> str | None:
     """Legacy function - redirects to enhanced version"""
     return create_enhanced_placeholder(filepath, prompt, prompt)
 
-def generate_with_api(optimized_prompt: str, filepath: str) -> str:
+def generate_with_api(optimized_prompt: str, filepath: str) -> str | None:
     """Legacy function - redirects to enhanced version"""
     return generate_with_enhanced_api(optimized_prompt, filepath, optimized_prompt)
 
-def call_freepik_api(prompt: str, filepath: str) -> str:
+def call_freepik_api(prompt: str, filepath: str) -> str | None:
     """Call Freepik API to generate image"""
     try:
         FREEPIK_API_KEY = os.getenv("FREEPIK_API_KEY")
+        
+        # Check if API key is available
+        if not FREEPIK_API_KEY:
+            print("[WARNING] Freepik API key not found. Skipping API call.")
+            return None
         
         headers = {
             "X-Freepik-API-Key": FREEPIK_API_KEY,
@@ -1412,15 +1657,37 @@ def call_freepik_api(prompt: str, filepath: str) -> str:
         if response.status_code == 200:
             data = response.json()
             if "data" in data and len(data["data"]) > 0:
-                image_url = data["data"][0]["base64"]
+                image_info = data["data"][0]
                 
-                # Save base64 image
-                import base64
-                image_data = base64.b64decode(image_url)
-                with open(filepath, "wb") as f:
-                    f.write(image_data)
+                # Handle base64 response
+                if "base64" in image_info:
+                    import base64
+                    try:
+                        image_data = base64.b64decode(image_info["base64"])
+                        with open(filepath, "wb") as f:
+                            f.write(image_data)
+                        print(f"[SUCCESS] Legacy Freepik image saved successfully: {filepath}")
+                        return filepath
+                    except Exception as e:
+                        print(f"[ERROR] Failed to save legacy Freepik image: {e}")
+                        return None
                 
-                return filepath
+                # Handle URL response
+                elif "url" in image_info:
+                    image_url = image_info["url"]
+                    try:
+                        img_response = requests.get(image_url, timeout=45)
+                        if img_response.status_code == 200:
+                            with open(filepath, "wb") as f:
+                                f.write(img_response.content)
+                            print(f"[SUCCESS] Legacy Freepik image downloaded successfully: {filepath}")
+                            return filepath
+                        else:
+                            print(f"[ERROR] Failed to download legacy Freepik image from URL. Status: {img_response.status_code}")
+                            return None
+                    except Exception as e:
+                        print(f"[ERROR] Failed to download legacy Freepik image from URL: {e}")
+                        return None
         
         # Fallback to placeholder if API fails
         print(f"API failed with status: {response.status_code}")
@@ -1430,7 +1697,7 @@ def call_freepik_api(prompt: str, filepath: str) -> str:
         print(f"API call failed: {e}")
         return create_placeholder_image(filepath, prompt)
 
-def create_placeholder_image(filepath: str, prompt_text: str) -> str:
+def create_placeholder_image(filepath: str, prompt_text: str) -> str | None:
     """Create a placeholder image when API generation fails"""
     try:
         img = Image.new('RGB', (1024, 1024), color=(245, 245, 245))
@@ -1472,6 +1739,7 @@ def create_placeholder_image(filepath: str, prompt_text: str) -> str:
         draw.text((380, 570), "Generated with AI", fill=(150, 150, 150), font=font_small)
         
         img.save(filepath, 'PNG')
+        print(f"[SUCCESS] Legacy placeholder created: {filepath}")
         return filepath
         
     except Exception as e:

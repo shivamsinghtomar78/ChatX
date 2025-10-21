@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Image Display</title>
+</head>
+<body>
+    <h1>Test Image Display</h1>
+    
+    <div id="content">
+        <p>I've generated an image for 'sitting in the snow with polar bear'.</p>
+        <p>[IMAGE_GENERATED:generated_3532.png]</p>
+    </div>
+    
+    <script>
+        // Simulate the frontend image parsing logic
+        function renderMessageContent(content) {
+            if (content.includes('[IMAGE_GENERATED:')) {
+                const parts = content.split('[IMAGE_GENERATED:');
+                const beforeImage = parts[0];
+                const afterParts = parts[1].split(']');
+                const filename = afterParts[0];
+                const afterImage = afterParts[1] || '';
+                const imageUrl = `/api/image/${filename}`;
+                
+                // Create the image display HTML
+                const container = document.createElement('div');
+                
+                if (beforeImage) {
+                    const beforeDiv = document.createElement('div');
+                    beforeDiv.style.marginBottom = '12px';
+                    beforeDiv.innerHTML = beforeImage;
+                    container.appendChild(beforeDiv);
+                }
+                
+                const imageContainer = document.createElement('div');
+                imageContainer.className = 'generated-image';
+                imageContainer.style.marginTop = '15px';
+                imageContainer.style.marginBottom = '15px';
+                
+                const loadingIndicator = document.createElement('div');
+                loadingIndicator.className = 'loading-indicator';
+                loadingIndicator.style.width = '100%';
+                loadingIndicator.style.height = '300px';
+                loadingIndicator.style.display = 'flex';
+                loadingIndicator.style.alignItems = 'center';
+                loadingIndicator.style.justifyContent = 'center';
+                loadingIndicator.style.backgroundColor = '#f3f4f6';
+                loadingIndicator.style.borderRadius = '12px';
+                loadingIndicator.style.border = '2px dashed #d1d5db';
+                loadingIndicator.innerHTML = '<div>Loading image...</div>';
+                imageContainer.appendChild(loadingIndicator);
+                
+                const img = document.createElement('img');
+                img.src = imageUrl;
+                img.alt = 'Generated AI Image';
+                img.style.maxWidth = '100%';
+                img.style.height = 'auto';
+                img.style.borderRadius = '12px';
+                img.style.border = '2px solid #3b82f6';
+                img.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
+                img.style.cursor = 'pointer';
+                img.style.display = 'none';
+                
+                img.onload = function(e) {
+                    loadingIndicator.style.display = 'none';
+                    e.target.style.display = 'block';
+                };
+                
+                img.onerror = function(e) {
+                    loadingIndicator.style.display = 'none';
+                    
+                    const errorDiv = document.createElement('div');
+                    errorDiv.style.width = '100%';
+                    errorDiv.style.padding = '20px';
+                    errorDiv.style.textAlign = 'center';
+                    errorDiv.style.backgroundColor = '#fee2e2';
+                    errorDiv.style.borderRadius = '12px';
+                    errorDiv.style.border = '2px solid #fecaca';
+                    errorDiv.style.color = '#b91c1c';
+                    errorDiv.innerHTML = `
+                        <div style="font-size:48px;margin-bottom:10px">⚠️</div>
+                        <div>Failed to load image</div>
+                        <div style="margin-top:8px;font-size:14px">The generated image may not be available</div>
+                        <button 
+                            onclick="window.location.reload()"
+                            style="margin-top:12px;padding:6px 12px;background:linear-gradient(135deg,#3b82f6,#6366f1);color:white;border:none;border-radius:6px;font-size:12px;cursor:pointer"
+                        >
+                            Retry
+                        </button>
+                    `;
+                    imageContainer.appendChild(errorDiv);
+                    e.target.style.display = 'none';
+                };
+                
+                img.onclick = function() {
+                    window.open(imageUrl, '_blank');
+                };
+                
+                imageContainer.appendChild(img);
+                
+                const buttonContainer = document.createElement('div');
+                buttonContainer.style.marginTop = '8px';
+                buttonContainer.style.display = 'flex';
+                buttonContainer.style.gap = '8px';
+                buttonContainer.style.alignItems = 'center';
+                
+                const downloadButton = document.createElement('button');
+                downloadButton.innerHTML = 'Download';
+                downloadButton.style.padding = '6px 12px';
+                downloadButton.style.background = 'linear-gradient(135deg, #3b82f6, #6366f1)';
+                downloadButton.style.color = 'white';
+                downloadButton.style.border = 'none';
+                downloadButton.style.borderRadius = '6px';
+                downloadButton.style.fontSize = '12px';
+                downloadButton.style.cursor = 'pointer';
+                downloadButton.onclick = function() {
+                    const link = document.createElement('a');
+                    link.href = imageUrl;
+                    link.download = filename;
+                    link.click();
+                };
+                
+                const viewButton = document.createElement('button');
+                viewButton.innerHTML = 'View Full Size';
+                viewButton.style.padding = '6px 12px';
+                viewButton.style.background = 'linear-gradient(135deg, #10b981, #3b82f6)';
+                viewButton.style.color = 'white';
+                viewButton.style.border = 'none';
+                viewButton.style.borderRadius = '6px';
+                viewButton.style.fontSize = '12px';
+                viewButton.style.cursor = 'pointer';
+                viewButton.onclick = function() {
+                    window.open(imageUrl, '_blank');
+                };
+                
+                buttonContainer.appendChild(downloadButton);
+                buttonContainer.appendChild(viewButton);
+                imageContainer.appendChild(buttonContainer);
+                
+                container.appendChild(imageContainer);
+                
+                if (afterImage) {
+                    const afterDiv = document.createElement('div');
+                    afterDiv.style.marginTop = '12px';
+                    afterDiv.innerHTML = afterImage;
+                    container.appendChild(afterDiv);
+                }
+                
+                return container;
+            }
+            
+            // If no image, just return the content as is
+            const div = document.createElement('div');
+            div.innerHTML = content;
+            return div;
+        }
+        
+        // Test the rendering
+        window.onload = function() {
+            const contentDiv = document.getElementById('content');
+            const content = contentDiv.innerHTML;
+            const rendered = renderMessageContent(content);
+            contentDiv.innerHTML = '';
+            contentDiv.appendChild(rendered);
+        };
+    </script>
+</body>
+</html>

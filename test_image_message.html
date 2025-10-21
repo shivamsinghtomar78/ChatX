@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Image Message</title>
+    <style>
+        .message {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 8px;
+            max-width: 80%;
+        }
+        .user {
+            background-color: #3b82f6;
+            color: white;
+            margin-left: auto;
+        }
+        .assistant {
+            background-color: #f3f4f6;
+            color: black;
+            margin-right: auto;
+        }
+        .message-text {
+            margin: 5px 0;
+        }
+        .generated-image {
+            margin: 15px 0;
+        }
+        .loading-indicator {
+            width: 100%;
+            height: 300px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #f3f4f6;
+            border-radius: 12px;
+            border: 2px dashed #d1d5db;
+        }
+    </style>
+</head>
+<body>
+    <h1>Test Image Message Display</h1>
+    
+    <div class="message assistant">
+        <div class="message-text">
+            <p>I've generated an image for 'sitting in the snow with polar bear'.</p>
+            
+            <div class="generated-image">
+                <div class="loading-indicator">
+                    <div>Loading image...</div>
+                </div>
+                <img 
+                    src="/api/image/generated_3532.png"
+                    alt="Generated AI Image"
+                    style="max-width:100%;height:auto;border-radius:12px;border:2px solid #3b82f6;box-shadow:0 4px 12px rgba(0,0,0,0.3);cursor:pointer;display:none"
+                    onload="this.previousElementSibling.style.display='none';this.style.display='block'"
+                    onerror="this.previousElementSibling.style.display='none';
+                            var errorDiv = document.createElement('div');
+                            errorDiv.style.width='100%';
+                            errorDiv.style.padding='20px';
+                            errorDiv.style.textAlign='center';
+                            errorDiv.style.backgroundColor='#fee2e2';
+                            errorDiv.style.borderRadius='12px';
+                            errorDiv.style.border='2px solid #fecaca';
+                            errorDiv.style.color='#b91c1c';
+                            errorDiv.innerHTML='<div style=\"font-size:48px;margin-bottom:10px\">⚠️</div><div>Failed to load image</div><div style=\"margin-top:8px;font-size:14px\">The generated image may not be available</div><button onclick=\"window.location.reload()\" style=\"margin-top:12px;padding:6px 12px;background:linear-gradient(135deg,#3b82f6,#6366f1);color:white;border:none;border-radius:6px;font-size:12px;cursor:pointer\">Retry</button>';
+                            this.parentElement.appendChild(errorDiv);
+                            this.style.display='none'"
+                    onclick="window.open('/api/image/generated_3532.png', '_blank')"
+                />
+                <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
+                    <button 
+                        onclick="var link = document.createElement('a'); link.href = '/api/image/generated_3532.png'; link.download = 'generated_3532.png'; link.click()"
+                        style="padding:6px 12px;background:linear-gradient(135deg,#3b82f6,#6366f1);color:white;border:none;border-radius:6px;font-size:12px;cursor:pointer"
+                    >
+                        Download
+                    </button>
+                    <button 
+                        onclick="window.open('/api/image/generated_3532.png', '_blank')"
+                        style="padding:6px 12px;background:linear-gradient(135deg,#10b981,#3b82f6);color:white;border:none;border-radius:6px;font-size:12px;cursor:pointer"
+                    >
+                        View Full Size
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Simulate image loading
+        window.onload = function() {
+            const img = document.querySelector('.generated-image img');
+            // Set a small delay to simulate loading
+            setTimeout(() => {
+                // This will trigger either onload or onerror
+                img.src = img.src + '&t=' + new Date().getTime();
+            }, 1000);
+        };
+    </script>
+</body>
+</html>

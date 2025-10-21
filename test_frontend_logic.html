@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Frontend Logic</title>
+</head>
+<body>
+    <h1>Test Frontend Image Parsing Logic</h1>
+    <div id="output"></div>
+    
+    <script>
+        // Test the exact response format from the backend
+        const aiResponse = "I've generated an image for 'sitting in the snow with polar bear'.\n\n[IMAGE_GENERATED:generated_3532.png]";
+        
+        // Test the parsing logic
+        function testImageParsing() {
+            const output = document.getElementById('output');
+            
+            if (aiResponse.includes('[IMAGE_GENERATED:')) {
+                const parts = aiResponse.split('[IMAGE_GENERATED:');
+                const beforeImage = parts[0];
+                const afterParts = parts[1].split(']');
+                const filename = afterParts[0];
+                const afterImage = afterParts[1] || '';
+                const imageUrl = `/api/image/${filename}`;
+                
+                output.innerHTML += '<p><strong>Parsing results:</strong></p>';
+                output.innerHTML += `<p>Before image: ${beforeImage}</p>`;
+                output.innerHTML += `<p>Filename: ${filename}</p>`;
+                output.innerHTML += `<p>After image: ${afterImage}</p>`;
+                output.innerHTML += `<p>Image URL: ${imageUrl}</p>`;
+                
+                // Verify the image URL is correct
+                const expectedUrl = '/api/image/generated_3532.png';
+                if (imageUrl === expectedUrl) {
+                    output.innerHTML += '<p style="color: green;">✓ Image URL is correct</p>';
+                } else {
+                    output.innerHTML += '<p style="color: red;">✗ Image URL is incorrect</p>';
+                    output.innerHTML += `<p>Expected: ${expectedUrl}</p>`;
+                    output.innerHTML += `<p>Actual: ${imageUrl}</p>`;
+                }
+                
+                // Test that the image file exists
+                fetch(imageUrl)
+                    .then(response => {
+                        if (response.ok) {
+                            output.innerHTML += '<p style="color: green;">✓ Image can be fetched from API</p>';
+                            output.innerHTML += `<p>Content-Type: ${response.headers.get('Content-Type')}</p>`;
+                        } else {
+                            output.innerHTML += '<p style="color: red;">✗ Failed to fetch image from API</p>';
+                            output.innerHTML += `<p>Status: ${response.status}</p>`;
+                        }
+                    })
+                    .catch(error => {
+                        output.innerHTML += '<p style="color: red;">✗ Error fetching image:</p>';
+                        output.innerHTML += `<p>${error}</p>`;
+                    });
+            } else {
+                output.innerHTML += '<p>Response does not contain image marker</p>';
+            }
+        }
+        
+        // Run the test
+        testImageParsing();
+    </script>
+</body>
+</html>

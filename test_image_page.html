@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Image Display</title>
+    <style>
+        .generated-image {
+            margin: 15px 0;
+        }
+        .loading-indicator {
+            width: 100%;
+            height: 300px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #f3f4f6;
+            border-radius: 12px;
+            border: 2px dashed #d1d5db;
+        }
+    </style>
+</head>
+<body>
+    <h1>Test Image Display</h1>
+    
+    <div class="generated-image">
+        <div class="loading-indicator" id="loading">
+            <div>Loading image...</div>
+        </div>
+        <img 
+            id="image"
+            src="http://localhost:5000/api/image/generated_3532.png"
+            alt="Generated AI Image"
+            style="max-width:100%;height:auto;border-radius:12px;border:2px solid #3b82f6;box-shadow:0 4px 12px rgba(0,0,0,0.3);cursor:pointer;display:none"
+        />
+        <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
+            <button id="downloadBtn">
+                Download
+            </button>
+            <button id="viewBtn">
+                View Full Size
+            </button>
+        </div>
+    </div>
+    
+    <script>
+        // Handle image loading
+        const img = document.getElementById('image');
+        const loading = document.getElementById('loading');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const viewBtn = document.getElementById('viewBtn');
+        
+        // Show loading indicator initially
+        loading.style.display = 'flex';
+        img.style.display = 'none';
+        
+        // When image loads successfully
+        img.onload = function() {
+            loading.style.display = 'none';
+            img.style.display = 'block';
+        };
+        
+        // When image fails to load
+        img.onerror = function() {
+            loading.style.display = 'none';
+            img.style.display = 'none';
+            
+            // Show error message
+            const errorDiv = document.createElement('div');
+            errorDiv.style.width = '100%';
+            errorDiv.style.padding = '20px';
+            errorDiv.style.textAlign = 'center';
+            errorDiv.style.backgroundColor = '#fee2e2';
+            errorDiv.style.borderRadius = '12px';
+            errorDiv.style.border = '2px solid #fecaca';
+            errorDiv.style.color = '#b91c1c';
+            errorDiv.innerHTML = `
+                <div style="font-size:48px;margin-bottom:10px">⚠️</div>
+                <div>Failed to load image</div>
+                <div style="margin-top:8px;font-size:14px">The generated image may not be available</div>
+                <button id="retryBtn" style="margin-top:12px;padding:6px 12px;background:linear-gradient(135deg,#3b82f6,#6366f1);color:white;border:none;border-radius:6px;font-size:12px;cursor:pointer">
+                    Retry
+                </button>
+            `;
+            document.querySelector('.generated-image').appendChild(errorDiv);
+            
+            // Add retry functionality
+            document.getElementById('retryBtn').onclick = function() {
+                // Remove error message
+                errorDiv.remove();
+                // Show loading indicator again
+                loading.style.display = 'flex';
+                // Reload image
+                img.src = img.src.split('?')[0] + '?t=' + new Date().getTime();
+            };
+        };
+        
+        // Add button functionality
+        downloadBtn.onclick = function() {
+            const link = document.createElement('a');
+            link.href = img.src;
+            link.download = 'generated_3532.png';
+            link.click();
+        };
+        
+        viewBtn.onclick = function() {
+            window.open(img.src, '_blank');
+        };
+        
+        // Start loading the image
+        window.onload = function() {
+            // This will trigger either onload or onerror
+            img.src = img.src;
+        };
+    </script>
+</body>
+</html>

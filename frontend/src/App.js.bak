@@ -2,12 +2,6 @@ import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { Search } from 'lucide-react';
-import { Button } from "./components/ui/button";
-import { Input } from "./components/ui/input";
-import { Textarea } from "./components/ui/textarea";
-import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./components/ui/dialog";
 import './App.css';
 
 const App = () => {
@@ -15,10 +9,6 @@ const App = () => {
   const [activeConversation, setActiveConversation] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [searchFilter, setSearchFilter] = useState('all');
-  const [searchSuggestions, setSearchSuggestions] = useState([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [highlightedSuggestion, setHighlightedSuggestion] = useState(-1); // New state for highlighted suggestion
   const [message, setMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [error, setError] = useState(null);
@@ -109,62 +99,12 @@ const App = () => {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, []);
 
-  // Memoized filtered conversations for performance - enhanced search
+  // Memoized filtered conversations for performance
   const filteredConversations = useMemo(() => {
-    if (!searchTerm) return conversations;
-    
-    const term = searchTerm.toLowerCase();
-    return conversations.filter(conv => {
-      switch (searchFilter) {
-        case 'title':
-          // Search only in conversation title
-          return conv.title.toLowerCase().includes(term);
-          
-        case 'content':
-          // Search only in message content
-          return conv.messages.some(msg => 
-            msg.content.toLowerCase().includes(term)
-          );
-          
-        case 'metadata':
-          // Search only in message metadata (role)
-          return conv.messages.some(msg => 
-            msg.role.toLowerCase().includes(term)
-          );
-          
-        case 'timestamps':
-          // Search only in timestamps (formatted dates)
-          return conv.createdAt.toLocaleDateString().toLowerCase().includes(term) ||
-                 conv.createdAt.toLocaleTimeString().toLowerCase().includes(term) ||
-                 conv.messages.some(msg => 
-                   new Date(msg.timestamp).toLocaleDateString().toLowerCase().includes(term) ||
-                   new Date(msg.timestamp).toLocaleTimeString().toLowerCase().includes(term)
-                 );
-          
-        default: // 'all'
-          // Search in all fields
-          if (conv.title.toLowerCase().includes(term)) return true;
-          
-          if (conv.messages.some(msg => 
-            msg.content.toLowerCase().includes(term)
-          )) return true;
-          
-          if (conv.messages.some(msg => 
-            msg.role.toLowerCase().includes(term)
-          )) return true;
-          
-          if (conv.createdAt.toLocaleDateString().toLowerCase().includes(term) ||
-              conv.createdAt.toLocaleTimeString().toLowerCase().includes(term)) return true;
-          
-          if (conv.messages.some(msg => 
-            new Date(msg.timestamp).toLocaleDateString().toLowerCase().includes(term) ||
-            new Date(msg.timestamp).toLocaleTimeString().toLowerCase().includes(term)
-          )) return true;
-          
-          return false;
-      }
-    });
-  }, [conversations, searchTerm, searchFilter]);
+    return conversations.filter(conv =>
+      conv.title.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [conversations, searchTerm]);
 
   // Virtualized conversation list for performance
   useEffect(() => {
@@ -563,20 +503,6 @@ const App = () => {
     });
   }, [showToastMessage]);
 
-  // Helper function to highlight search terms
-  const highlightText = useCallback((text, searchTerm) => {
-    if (!searchTerm) return text;
-    
-    const regex = new RegExp(`(${searchTerm})`, 'gi');
-    const parts = text.split(regex);
-    
-    return parts.map((part, index) => 
-      regex.test(part) ? 
-        <mark key={index} className="search-highlight">{part}</mark> : 
-        part
-    );
-  }, []);
-
   // Get relative time
   const getRelativeTime = useCallback((timestamp) => {
     const now = new Date();
@@ -895,44 +821,6 @@ const App = () => {
     }
   }, [activeConversation, searchInChat, calculateVisibleMessages]);
 
-  // Generate search suggestions based on conversation data
-  const generateSearchSuggestions = useCallback((term) => {
-    if (!term) {
-      setSearchSuggestions([]);
-      return;
-    }
-    
-    const suggestions = new Set();
-    const lowerTerm = term.toLowerCase();
-    
-    // Add suggestions from conversation titles
-    conversations.forEach(conv => {
-      if (conv.title.toLowerCase().includes(lowerTerm)) {
-        suggestions.add(conv.title);
-      }
-    });
-    
-    // Add suggestions from message content
-    conversations.forEach(conv => {
-      conv.messages.forEach(msg => {
-        if (msg.content.toLowerCase().includes(lowerTerm)) {
-          // Extract words around the search term
-          const words = msg.content.split(/\s+/);
-          const termIndex = words.findIndex(word => word.toLowerCase().includes(lowerTerm));
-          if (termIndex !== -1) {
-            const start = Math.max(0, termIndex - 2);
-            const end = Math.min(words.length, termIndex + 3);
-            const suggestion = words.slice(start, end).join(' ');
-            suggestions.add(suggestion);
-          }
-        }
-      });
-    });
-    
-    // Convert to array and limit to 5 suggestions
-    setSearchSuggestions(Array.from(suggestions).slice(0, 5));
-  }, [conversations]);
-
   return (
     <div className={`app ${theme}`} role="main">
       {/* Toast Notification */}
@@ -980,97 +868,14 @@ const App = () => {
           </div>
 
           <div className={`search-container ${theme}`}>
-            <div className="relative">
-              <Search className="absolute search-icon w-4 h-4" />
-              <Input
-                type="text"
-                placeholder="Search conversations..."
-                value={searchTerm}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  setSearchTerm(value);
-                  generateSearchSuggestions(value);
-                  setShowSuggestions(value.length > 0);
-                  setHighlightedSuggestion(-1);
-                }}
-                onKeyDown={(e) => {
-                  if (showSuggestions && searchSuggestions.length > 0) {
-                    if (e.key === 'ArrowDown') {
-                      e.preventDefault();
-                      setHighlightedSuggestion(prev => 
-                        prev < searchSuggestions.length - 1 ? prev + 1 : 0
-                      );
-                    } else if (e.key === 'ArrowUp') {
-                      e.preventDefault();
-                      setHighlightedSuggestion(prev => 
-                        prev > 0 ? prev - 1 : searchSuggestions.length - 1
-                      );
-                    } else if (e.key === 'Enter') {
-                      e.preventDefault();
-                      if (highlightedSuggestion >= 0) {
-                        setSearchTerm(searchSuggestions[highlightedSuggestion]);
-                        setShowSuggestions(false);
-                        setHighlightedSuggestion(-1);
-                      }
-                    } else if (e.key === 'Escape') {
-                      setShowSuggestions(false);
-                      setHighlightedSuggestion(-1);
-                    }
-                  }
-                }}
-                onFocus={() => {
-                  setShowSuggestions(searchTerm.length > 0);
-                  if (searchTerm.length > 0) {
-                    generateSearchSuggestions(searchTerm);
-                  }
-                }}
-                onBlur={() => setTimeout(() => {
-                  setShowSuggestions(false);
-                  setHighlightedSuggestion(-1);
-                }, 200)}
-                className="search-input"
-                aria-label="Search conversations"
-                aria-autocomplete="list"
-                aria-expanded={showSuggestions && searchSuggestions.length > 0}
-              />
-            </div>
-            {showSuggestions && searchSuggestions.length > 0 && (
-              <div className={`search-suggestions ${theme}`}>
-                {searchSuggestions.map((suggestion, index) => (
-                  <div
-                    key={index}
-                    className={`search-suggestion-item ${theme} ${
-                      index === highlightedSuggestion ? 'highlighted' : ''
-                    }`}
-                    onClick={() => {
-                      setSearchTerm(suggestion);
-                      setShowSuggestions(false);
-                      setHighlightedSuggestion(-1);
-                    }}
-                    onMouseDown={(e) => e.preventDefault()} // Prevent blur event
-                    onMouseEnter={() => setHighlightedSuggestion(index)}
-                  >
-                    {highlightText(suggestion, searchTerm)}
-                  </div>
-                ))}
-              </div>
-            )}
-            {searchTerm && (
-              <div className={`search-filters ${theme}`}>
-                <select 
-                  value={searchFilter}
-                  onChange={(e) => setSearchFilter(e.target.value)}
-                  className={`search-filter-select ${theme}`}
-                  aria-label="Search filter"
-                >
-                  <option value="all">All</option>
-                  <option value="title">Title</option>
-                  <option value="content">Content</option>
-                  <option value="metadata">Metadata</option>
-                  <option value="timestamps">Timestamps</option>
-                </select>
-              </div>
-            )}
+            <input
+              type="text"
+              placeholder="Search conversations..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className={`search-input ${theme}`}
+              aria-label="Search conversations"
+            />
           </div>
 
           <div 
@@ -1099,9 +904,7 @@ const App = () => {
                   }
                 }}
               >
-                <span className={`conversation-title ${theme}`}>
-                  {highlightText(conv.title, searchTerm)}
-                </span>
+                <span className={`conversation-title ${theme}`}>{conv.title}</span>
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -1114,6 +917,14 @@ const App = () => {
                 </button>
               </div>
             ))}
+          </div>
+
+          <div className={`user-profile ${theme}`}>
+            <div className={`user-avatar ${theme}`} aria-hidden="true">👤</div>
+            <div className={`user-info ${theme}`}>
+              <div className={`user-name ${theme}`}>User</div>
+              <div className={`user-email ${theme}`}>user@example.com</div>
+            </div>
           </div>
         </div>
 
@@ -1187,7 +998,7 @@ const App = () => {
           {/* Search Bar */}
           {showSearch && activeConversation && (
             <div className={`search-in-chat ${theme}`}>
-              <Input
+              <input
                 type="text"
                 placeholder="Search in this chat..."
                 value={searchInChat}
@@ -1261,12 +1072,8 @@ const App = () => {
                       {msg.role === 'user' ? '👤' : '🤖'}
                     </div>
                     <div className={`message-content ${theme}`}>
-                      <div className={`message-card ${msg.role} ${theme}`}>
-                        <div className="message-card-content">
-                          <div className={`message-text ${theme}`}>
-                            {renderMessageContent(msg.content)}
-                          </div>
-                        </div>
+                      <div className={`message-text ${theme}`}>
+                        {renderMessageContent(msg.content)}
                       </div>
                       <div className={`message-footer ${theme}`}>
                         <div className={`message-time ${theme}`}>
@@ -1355,30 +1162,28 @@ const App = () => {
           {/* Input Area */}
           <div className={`input-area ${theme}`}>
             <div className={`input-actions ${theme}`}>
-              <Button 
+              <button 
                 onClick={() => setShowTemplates(!showTemplates)} 
                 className={`action-btn ${theme}`} 
                 title="Templates"
                 aria-label="Open templates"
-                variant="ghost"
               >
                 📝
-              </Button>
-              <Button 
+              </button>
+              <button 
                 onClick={startVoiceInput} 
                 className={`action-btn ${theme} ${isListening ? 'active' : ''}`} 
                 title="Voice input"
                 aria-label={isListening ? "Stop listening" : "Start voice input"}
                 aria-pressed={isListening}
-                variant="ghost"
               >
                 {isListening ? '🔴' : '🎤'}
-              </Button>
+              </button>
             </div>
             <div 
               className={`input-container ${theme} ${isFocused ? 'focused' : ''}`}
             >
-              <Textarea
+              <textarea
                 ref={textareaRef}
                 value={message}
                 onChange={handleTextareaChange}
@@ -1390,16 +1195,15 @@ const App = () => {
                 rows="1"
                 aria-label="Type your message"
               />
-              <Button
+              <button
                 onClick={sendMessage}
                 disabled={!message.trim() || isTyping}
                 className={`send-btn ${message.trim() && !isTyping ? 'active' : ''} ${theme}`}
                 aria-label="Send message"
                 aria-disabled={!message.trim() || isTyping}
-                variant="default"
               >
                 {isTyping ? '⏳' : '➤'}
-              </Button>
+              </button>
             </div>
           </div>
         </div>
