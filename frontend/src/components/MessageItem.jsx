@@ -6,17 +6,18 @@ import { Avatar, AvatarFallback } from './ui/avatar';
 import { Volume2, Copy, Pin, ThumbsUp, User, Bot } from 'lucide-react';
 import { cn } from '../lib/utils';
 import ImageGallery from './ImageGallery';
+import './MessageItem.css';
 
-const MessageItem = memo(({ 
-  message, 
-  theme, 
-  reactions, 
-  pinnedMessages, 
-  isSpeaking, 
-  getRelativeTime, 
-  speakText, 
-  copyToClipboard, 
-  togglePin, 
+const MessageItem = memo(({
+  message,
+  theme,
+  reactions,
+  pinnedMessages,
+  isSpeaking,
+  getRelativeTime,
+  speakText,
+  copyToClipboard,
+  togglePin,
   toggleReaction,
   showToastMessage
 }) => {
@@ -27,13 +28,13 @@ const MessageItem = memo(({
   // Helper function to highlight search terms
   const highlightText = useCallback((text, searchTerm) => {
     if (!searchTerm) return text;
-    
+
     const regex = new RegExp(`(${searchTerm})`, 'gi');
     const parts = text.split(regex);
-    
-    return parts.map((part, index) => 
-      regex.test(part) ? 
-        <mark key={index} className="search-highlight">{part}</mark> : 
+
+    return parts.map((part, index) =>
+      regex.test(part) ?
+        <mark key={index} className="search-highlight">{part}</mark> :
         part
     );
   }, []);
@@ -45,7 +46,7 @@ const MessageItem = memo(({
       // Extract all image references
       const imageRegex = /\[IMAGE_GENERATED:([^\]]+)\]/g;
       const imageMatches = [...content.matchAll(imageRegex)];
-      
+
       // If we have images, process them
       if (imageMatches.length > 0) {
         // Extract images with their filenames and surrounding content
@@ -54,15 +55,15 @@ const MessageItem = memo(({
           prompt: `AI generated image ${index + 1}`, // In a real implementation, we would extract the actual prompt
           index
         }));
-        
+
         // Split content into parts
         const parts = content.split(/\[IMAGE_GENERATED:[^\]]+\]/);
-        
+
         return (
           <div>
             {/* Content before first image */}
             {parts[0] && <div className="image-container-before"><ReactMarkdown>{parts[0]}</ReactMarkdown></div>}
-            
+
             {/* Handle single image or multiple images */}
             {images.length === 1 ? (
               // Single image handling (existing implementation)
@@ -70,7 +71,7 @@ const MessageItem = memo(({
                 <div className={`loading-indicator ${theme}`}>
                   <div>Loading image...</div>
                 </div>
-                <img 
+                <img
                   src={`/api/image/${images[0].filename}?t=${Date.now()}`}
                   alt="Generated AI Image"
                   className={`generated-image ${theme}`}
@@ -89,14 +90,14 @@ const MessageItem = memo(({
                     if (loadingIndicator) {
                       loadingIndicator.classList.add('hidden');
                     }
-                    
+
                     // Check if error div already exists to prevent duplicates
                     const existingError = e.target.parentElement.querySelector('.image-error');
                     if (existingError) {
                       existingError.classList.remove('hidden');
                       return;
                     }
-                    
+
                     // Create error message with retry functionality
                     const errorDiv = document.createElement('div');
                     errorDiv.className = `image-error ${theme} visible`;
@@ -113,7 +114,7 @@ const MessageItem = memo(({
                   loading="lazy"
                 />
                 <div className="image-actions">
-                  <button 
+                  <button
                     onClick={() => {
                       const link = document.createElement('a');
                       link.href = `/api/image/${images[0].filename}`;
@@ -125,7 +126,7 @@ const MessageItem = memo(({
                   >
                     Download
                   </button>
-                  <button 
+                  <button
                     onClick={() => {
                       // Open image in new tab
                       window.open(`/api/image/${images[0].filename}`, '_blank');
@@ -142,8 +143,8 @@ const MessageItem = memo(({
               <div className="image-gallery-container">
                 <div className="gallery-preview">
                   {images.slice(0, 4).map((image, index) => (
-                    <div 
-                      key={index} 
+                    <div
+                      key={index}
                       className={`gallery-item ${theme} ${index === 0 ? 'main' : 'thumbnail'}`}
                       onClick={() => {
                         setGalleryImages(images);
@@ -151,7 +152,7 @@ const MessageItem = memo(({
                         setShowGallery(true);
                       }}
                     >
-                      <img 
+                      <img
                         src={`/api/image/${image.filename}?t=${Date.now()}`}
                         alt={`Generated AI Image ${index + 1}`}
                         className={`gallery-image ${theme}`}
@@ -166,7 +167,7 @@ const MessageItem = memo(({
                   ))}
                 </div>
                 <div className="gallery-actions">
-                  <button 
+                  <button
                     onClick={() => {
                       setGalleryImages(images);
                       setInitialGalleryIndex(0);
@@ -179,23 +180,23 @@ const MessageItem = memo(({
                 </div>
               </div>
             )}
-            
+
             {/* Content after last image */}
             {parts[parts.length - 1] && <div className="image-container-after"><ReactMarkdown>{parts[parts.length - 1]}</ReactMarkdown></div>}
           </div>
         );
       }
     }
-    
+
     return (
       <ReactMarkdown
         components={{
           // Add syntax highlighting for code blocks
-          code({node, inline, className, children, ...props}) {
+          code({ node, inline, className, children, ...props }) {
             if (inline) {
               return <code className={className} {...props}>{children}</code>;
             }
-            
+
             // For block code, we could add syntax highlighting here
             // For now, we'll keep it simple
             return (
@@ -223,7 +224,7 @@ const MessageItem = memo(({
   const isLiked = useMemo(() => reactions[message.id] === 'like', [reactions, message.id]);
 
   return (
-    <div 
+    <div
       data-message-id={message.id}
       className={cn(
         "flex gap-3 mb-6 group animate-in fade-in-0 slide-in-from-bottom-4 duration-300",

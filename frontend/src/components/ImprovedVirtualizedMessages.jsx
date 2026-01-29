@@ -28,7 +28,7 @@ const ImprovedVirtualizedMessages = memo(({
   const DEFAULT_ITEM_HEIGHT = 96; // 8px grid: 12 units
   const MIN_ITEM_HEIGHT = 72;     // 8px grid: 9 units
   const MAX_ITEM_HEIGHT = 1200;
-  const OVERSCAN_COUNT = 15;
+  const OVERSCAN_COUNT = 5;
 
   // Calculate or retrieve item height with improved caching
   const getItemHeight = useCallback((index) => {
@@ -36,43 +36,43 @@ const ImprovedVirtualizedMessages = memo(({
     if (itemHeightCache.current.has(index)) {
       return Math.min(Math.max(itemHeightCache.current.get(index), MIN_ITEM_HEIGHT), MAX_ITEM_HEIGHT);
     }
-    
+
     // Estimate height based on message content with better heuristics
     const message = messages[index];
     if (!message) return DEFAULT_ITEM_HEIGHT;
-    
+
     // Base height calculation - Professional spacing (8px grid)
     const baseHeight = 72; // 9 units: avatar(40) + padding(32)
     const contentLength = message.content.length;
-    
+
     // Estimate height based on content characteristics
     let estimatedHeight = baseHeight;
-    
+
     if (contentLength > 0) {
       // Factor in line breaks for more accurate estimation
       const lineBreaks = (message.content.match(/\n/g) || []).length;
-      
+
       // Estimate lines based on content length and line breaks
       const estimatedLines = Math.ceil(contentLength / 70) + lineBreaks;
-      
+
       // Height per line estimate - 1.6 line-height for readability
       const lineHeight = 26; // Consistent across themes
       estimatedHeight += estimatedLines * lineHeight;
-      
+
       // Extra space for images - Professional proportions
       if (message.content.includes('[IMAGE_GENERATED:')) {
         estimatedHeight += 368; // 8px grid: 46 units
       }
-      
+
       // Extra space for code blocks - Professional spacing
       if (message.content.includes('```')) {
         estimatedHeight += 104; // 8px grid: 13 units
       }
     }
-    
+
     // Ensure reasonable bounds
     const finalHeight = Math.min(Math.max(estimatedHeight, MIN_ITEM_HEIGHT), MAX_ITEM_HEIGHT);
-    
+
     // Cache the calculated height
     itemHeightCache.current.set(index, finalHeight);
     return finalHeight;
@@ -83,7 +83,7 @@ const ImprovedVirtualizedMessages = memo(({
     itemHeightCache.current.clear();
     itemRefs.current.clear();
     pendingMeasurements.current.clear();
-    
+
     // Force list to recalculate positions
     if (listRef.current) {
       listRef.current.resetAfterIndex(0);
@@ -96,9 +96,9 @@ const ImprovedVirtualizedMessages = memo(({
     if (typeof index !== 'number' || typeof height !== 'number' || height <= 0) {
       return;
     }
-    
+
     const clampedHeight = Math.min(Math.max(height, MIN_ITEM_HEIGHT), MAX_ITEM_HEIGHT);
-    
+
     // Only update if height has actually changed
     if (itemHeightCache.current.get(index) !== clampedHeight) {
       itemHeightCache.current.set(index, clampedHeight);
@@ -113,9 +113,9 @@ const ImprovedVirtualizedMessages = memo(({
     if (itemHeightCache.current.has(index) || pendingMeasurements.current.has(index)) {
       return;
     }
-    
+
     pendingMeasurements.current.add(index);
-    
+
     // Use requestAnimationFrame to ensure DOM is ready
     requestAnimationFrame(() => {
       const element = itemRefs.current.get(index);
@@ -149,7 +149,7 @@ const ImprovedVirtualizedMessages = memo(({
     if (!message) return null;
 
     return (
-      <div 
+      <div
         style={style}
         ref={(element) => {
           if (element) {
@@ -228,7 +228,7 @@ const ImprovedVirtualizedMessages = memo(({
     if (messages.length > 0) {
       // Schedule measurements with better prioritization
       const timeoutIds = [];
-      
+
       // Measure visible items first (next frame)
       timeoutIds.push(setTimeout(() => {
         const visibleCount = Math.min(messages.length, 15);
@@ -236,7 +236,7 @@ const ImprovedVirtualizedMessages = memo(({
           measureItemHeight(i);
         }
       }, 0));
-      
+
       // Measure additional items after a short delay
       timeoutIds.push(setTimeout(() => {
         const additionalCount = Math.min(messages.length, 30);
@@ -244,7 +244,7 @@ const ImprovedVirtualizedMessages = memo(({
           measureItemHeight(i);
         }
       }, 100));
-      
+
       // Schedule another measurement pass after images might load
       timeoutIds.push(setTimeout(() => {
         // Re-measure all items that might contain images
@@ -254,7 +254,7 @@ const ImprovedVirtualizedMessages = memo(({
           }
         });
       }, 500));
-      
+
       // Final cleanup
       return () => {
         timeoutIds.forEach(id => clearTimeout(id));

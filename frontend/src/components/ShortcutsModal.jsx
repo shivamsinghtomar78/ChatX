@@ -1,47 +1,37 @@
 import React, { memo } from 'react';
+import { X, Command } from 'lucide-react';
+import './Modals.css';
 
-const ShortcutsModal = memo(({ showShortcuts, setShowShortcuts, theme }) => {
-  if (!showShortcuts) return null;
+const SHORTCUTS = [
+  { key: 'Enter', description: 'Send message' },
+  { key: 'Shift + Enter', description: 'New line' },
+  { key: 'Ctrl + /', description: 'Open shortcuts' },
+  { key: 'Ctrl + K', description: 'Search conversations' },
+  { key: 'Ctrl + N', description: 'New conversation' },
+  { key: 'Escape', description: 'Close modal' }
+];
 
+const ShortcutsModal = memo(({ onClose }) => {
   return (
-    <div 
-      className="modal-overlay" 
-      onClick={() => setShowShortcuts(false)}
-      role="dialog"
-      aria-labelledby="shortcuts-modal-title"
-      aria-modal="true"
-    >
-      <div 
-        className={`modal ${theme}`} 
-        onClick={(e) => e.stopPropagation()}
-        role="document"
-      >
-        <h2 id="shortcuts-modal-title" className={`modal-title ${theme}`}>Keyboard Shortcuts</h2>
-        <div className={`shortcuts-list ${theme}`}>
-          <div className={`shortcut-item ${theme}`}>
-            <kbd className={`kbd ${theme}`}>Ctrl</kbd> + <kbd className={`kbd ${theme}`}>K</kbd>
-            <span className={`shortcut-text ${theme}`}>Show shortcuts</span>
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content small" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <div className="title-with-icon">
+            <Command size={20} />
+            <h2>Keyboard Shortcuts</h2>
           </div>
-          <div className={`shortcut-item ${theme}`}>
-            <kbd className={`kbd ${theme}`}>Enter</kbd>
-            <span className={`shortcut-text ${theme}`}>Send message</span>
-          </div>
-          <div className={`shortcut-item ${theme}`}>
-            <kbd className={`kbd ${theme}`}>Shift</kbd> + <kbd className={`kbd ${theme}`}>Enter</kbd>
-            <span className={`shortcut-text ${theme}`}>New line</span>
-          </div>
-          <div className={`shortcut-item ${theme}`}>
-            <kbd className={`kbd ${theme}`}>Esc</kbd>
-            <span className={`shortcut-text ${theme}`}>Close modals</span>
+          <button className="close-btn" onClick={onClose}><X size={20} /></button>
+        </div>
+        <div className="modal-body">
+          <div className="shortcuts-list">
+            {SHORTCUTS.map((s, idx) => (
+              <div key={idx} className="shortcut-item">
+                <span className="shortcut-desc">{s.description}</span>
+                <kbd className="shortcut-key">{s.key}</kbd>
+              </div>
+            ))}
           </div>
         </div>
-        <button 
-          className={`modal-close ${theme}`} 
-          onClick={() => setShowShortcuts(false)}
-          aria-label="Close shortcuts modal"
-        >
-          ×
-        </button>
       </div>
     </div>
   );

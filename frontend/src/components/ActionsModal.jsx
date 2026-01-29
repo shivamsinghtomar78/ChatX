@@ -1,50 +1,38 @@
-import React, { memo, useCallback } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
-import { Button } from './ui/button';
-import { Download, Trash2, RefreshCw, FileText, Share2 } from 'lucide-react';
-import { cn } from '../lib/utils';
+import React, { memo } from 'react';
+import { X, Download, Trash2, Share2, Settings } from 'lucide-react';
+import './Modals.css';
 
-const actions = [
-  { id: 'export', icon: Download, title: 'Export Chat', description: 'Download conversation as text file' },
-  { id: 'clear', icon: Trash2, title: 'Clear Chat', description: 'Remove all messages', variant: 'destructive' },
-  { id: 'regenerate', icon: RefreshCw, title: 'Regenerate Response', description: 'Get a new response' },
-  { id: 'summary', icon: FileText, title: 'Generate Summary', description: 'Create a summary' },
-  { id: 'share', icon: Share2, title: 'Share Conversation', description: 'Share with others' },
-];
-
-const ActionsModal = memo(({ isOpen, onClose, onRegenerate, onSummary, onShare, theme }) => {
-  const handlers = {
-    export: useCallback(() => { onClose(); }, [onClose]),
-    clear: useCallback(() => { onClose(); }, [onClose]),
-    regenerate: useCallback(() => { onRegenerate?.(); onClose(); }, [onRegenerate, onClose]),
-    summary: useCallback(() => { onSummary?.(); onClose(); }, [onSummary, onClose]),
-    share: useCallback(() => { onShare?.(); onClose(); }, [onShare, onClose]),
-  };
-
+const ActionsModal = memo(({ onClose, onExport, onClearChat }) => {
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Chat Actions</DialogTitle>
-        </DialogHeader>
-        <div className="grid gap-2 py-4">
-          {actions.map(({ id, icon: Icon, title, description, variant }) => (
-            <Button
-              key={id}
-              variant={variant || 'outline'}
-              className={cn("justify-start h-auto py-3", variant === 'destructive' && "text-destructive-foreground")}
-              onClick={handlers[id]}
-            >
-              <Icon className="mr-3 h-4 w-4" />
-              <div className="text-left">
-                <div className="font-medium">{title}</div>
-                <div className="text-xs text-muted-foreground">{description}</div>
-              </div>
-            </Button>
-          ))}
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content small" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2>Chat Actions</h2>
+          <button className="close-btn" onClick={onClose}><X size={20} /></button>
         </div>
-      </DialogContent>
-    </Dialog>
+        <div className="modal-body">
+          <div className="actions-list">
+            <button className="action-item" onClick={() => { onExport(); onClose(); }}>
+              <Download size={18} />
+              <span>Export Conversation (.txt)</span>
+            </button>
+            <button className="action-item" onClick={() => { /* TODO: Share */ onClose(); }}>
+              <Share2 size={18} />
+              <span>Share Link</span>
+            </button>
+            <div className="divider" />
+            <button className="action-item" onClick={() => { /* TODO: Settings */ onClose(); }}>
+              <Settings size={18} />
+              <span>Settings</span>
+            </button>
+            <button className="action-item danger" onClick={() => { onClearChat(); onClose(); }}>
+              <Trash2 size={18} />
+              <span>Clear Chat History</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 });
 
