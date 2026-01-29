@@ -74,7 +74,17 @@ const App = () => {
 
   return (
     <ErrorBoundary>
-      <div className={`app-container ${theme}`}>
+      <div
+        className={`app-container ${theme}`}
+        style={{
+          display: 'flex',
+          height: '100vh',
+          width: '100vw',
+          overflow: 'hidden',
+          backgroundColor: 'hsl(var(--background))',
+          color: 'hsl(var(--foreground))'
+        }}
+      >
         <Sidebar
           isOpen={sidebarOpen || !isMobile}
           onClose={() => setSidebarOpen(false)}
@@ -134,17 +144,6 @@ const App = () => {
 
         <Toast toast={toast} onClose={hideToast} />
       </div>
-
-      <style jsx>{`
-        .app-container {
-          display: flex;
-          height: 100vh;
-          width: 100vw;
-          overflow: hidden;
-          background: hsl(var(--background));
-          color: hsl(var(--foreground));
-        }
-      `}</style>
     </ErrorBoundary>
   );
 };
