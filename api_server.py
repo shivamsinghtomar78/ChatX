@@ -5,7 +5,7 @@ import os
 from functools import wraps
 from time import time
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='frontend/build', static_url_path='/')
 
 # Read allowed origins from environment (comma-separated) or use defaults
 ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:3001").split(",")
@@ -111,28 +111,23 @@ def chat():
 def health():
     return jsonify({'status': 'healthy'})
 
-@app.route('/static/js/<path:filename>')
-def serve_js(filename):
-    js_folder = os.path.join(os.path.dirname(__file__), 'frontend', 'build', 'static', 'js')
-    file_path = os.path.join(js_folder, filename)
-    if os.path.exists(file_path):
-        return send_file(file_path, mimetype='application/javascript')
-    return '', 404
-
-@app.route('/static/css/<path:filename>')
-def serve_css(filename):
-    css_folder = os.path.join(os.path.dirname(__file__), 'frontend', 'build', 'static', 'css')
-    file_path = os.path.join(css_folder, filename)
-    if os.path.exists(file_path):
-        return send_file(file_path, mimetype='text/css')
-    return '', 404
-
-@app.route('/')
-def home():
-    index_path = os.path.join(os.path.dirname(__file__), 'frontend', 'build', 'index.html')
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def serve(path):
+    # Ensure path doesn't start with 'api'
+    if path.startswith('api/') or path == 'api':
+        return jsonify({'error': 'Not found'}), 404
+    
+    # Check if the requested file exists in the static folder
+    if path != "" and os.path.exists(os.path.join(app.static_folder, path)):
+        return send_from_directory(app.static_folder, path)
+    
+    # Otherwise, serve index.html for React routing
+    index_path = os.path.join(app.static_folder, 'index.html')
     if os.path.exists(index_path):
         return send_file(index_path)
-    return '<h1>ChatX API Running</h1><p>Frontend build not found</p>'
+    
+    return '<h1>ChatX API Running</h1><p>Frontend build not found. Please run <code>npm run build</code> in the frontend directory.</p>'
 
 @app.route('/test')
 def test():

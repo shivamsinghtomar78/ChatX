@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: chatx
+    runtime: python
+    buildCommand: "./build.sh"
+    startCommand: "gunicorn app:app"
+    envVars:
+      - key: FLASK_APP
+        value: app.py
+      - key: FLASK_ENV
+        value: production
+      - key: PYTHON_VERSION
+        value: 3.10.0
+      - key: ALLOWED_ORIGINS
+        value: "https://chatx-uxfq.onrender.com"
