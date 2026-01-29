@@ -1,0 +1,143 @@
+/* Responsive Fixes and Mobile Optimizations */
+
+/* Fix mobile viewport height */
+@supports (-webkit-touch-callout: none) {
+  .app {
+    min-height: -webkit-fill-available;
+  }
+}
+
+/* Prevent zoom on input focus (iOS) */
+input, textarea, select {
+  font-size: 16px !important;
+}
+
+/* Fix mobile sidebar overlay */
+@media (max-width: 767px) {
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    height: -webkit-fill-available;
+    z-index: 1000;
+  }
+  
+  .overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 999;
+  }
+  
+  /* Fix mobile input area */
+  .input-area {
+    padding-bottom: env(safe-area-inset-bottom, 16px);
+  }
+  
+  /* Fix mobile header */
+  .header {
+    padding-left: max(16px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right));
+  }
+  
+  /* Improve mobile touch targets */
+  .header-btn,
+  .menu-btn,
+  .delete-btn {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
+/* Tablet optimizations */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .sidebar {
+    width: 280px;
+  }
+  
+  .messages {
+    max-width: 700px;
+  }
+}
+
+/* Desktop optimizations */
+@media (min-width: 1024px) {
+  .sidebar {
+    width: 320px;
+  }
+  
+  .messages {
+    max-width: 800px;
+  }
+  
+  /* Show hover states only on desktop */
+  @media (hover: hover) {
+    .conversation-item:hover .delete-btn {
+      opacity: 1;
+    }
+  }
+}
+
+/* Large desktop */
+@media (min-width: 1440px) {
+  .messages {
+    max-width: 900px;
+  }
+}
+
+/* Fix scrolling on mobile */
+.messages-container {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+/* Prevent text selection on buttons */
+button {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Fix iOS safe areas */
+@supports (padding: max(0px)) {
+  .app {
+    padding-left: max(0px, env(safe-area-inset-left));
+    padding-right: max(0px, env(safe-area-inset-right));
+  }
+}
+
+/* Improve focus visibility */
+*:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+
+/* Fix modal positioning on mobile */
+@media (max-width: 640px) {
+  [role="dialog"] {
+    max-width: calc(100vw - 32px);
+    max-height: calc(100vh - 32px);
+  }
+}
+
+/* Prevent layout shift */
+.skeleton {
+  min-height: 20px;
+}
+
+/* Fix image loading */
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}

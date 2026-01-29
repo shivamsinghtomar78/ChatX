@@ -2,9 +2,51 @@ from flask import Flask, request, jsonify, send_from_directory, send_file
 from flask_cors import CORS
 import uuid
 import os
+from functools import wraps
+from time import time
 
 app = Flask(__name__)
-CORS(app)
+
+# Read allowed origins from environment (comma-separated) or use defaults
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:3001").split(",")
+ALLOWED_ORIGINS = [origin.strip() for origin in ALLOWED_ORIGINS if origin.strip()]
+
+# Configure CORS with environment-based origins
+CORS(app, resources={
+    r"/api/*": {
+        "origins": ALLOWED_ORIGINS,
+        "methods": ["GET", "POST"],
+        "allow_headers": ["Content-Type", "X-Requested-With"]
+    }
+})
+
+# Simple rate limiting
+rate_limit_store = {}
+
+def rate_limit(max_requests=10, window=60):
+    """Rate limit decorator: max_requests per window seconds"""
+    def decorator(f):
+        @wraps(f)
+        def wrapped(*args, **kwargs):
+            client_ip = request.remote_addr
+            now = time()
+            
+            if client_ip not in rate_limit_store:
+                rate_limit_store[client_ip] = []
+            
+            # Clean old requests
+            rate_limit_store[client_ip] = [
+                req_time for req_time in rate_limit_store[client_ip]
+                if now - req_time < window
+            ]
+            
+            if len(rate_limit_store[client_ip]) >= max_requests:
+                return jsonify({'error': 'Rate limit exceeded'}), 429
+            
+            rate_limit_store[client_ip].append(now)
+            return f(*args, **kwargs)
+        return wrapped
+    return decorator
 
 # Lazy load chatbot to prevent startup crashes
 chatbot = None
@@ -16,6 +58,7 @@ def get_chatbot():
     return chatbot
 
 @app.route('/api/chat', methods=['POST'])
+@rate_limit(max_requests=20, window=60)
 def chat():
     try:
         data = request.json or {}
@@ -113,6 +156,19 @@ def serve_image(filename):
     # Additional validation: ensure filename is not empty and doesn't start with a dot
     if not filename or filename.startswith('.'):
         return '', 400  # Bad Request
+    
+    # Additional validation: ensure filename doesn't contain multiple extensions
+    if filename.count('.') > 1:
+        return '', 400  # Bad Request
+    
+    # Additional validation: ensure filename has a valid extension
+    valid_extensions = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg']
+    if not any(filename.lower().endswith(ext) for ext in valid_extensions):
+        # Allow PNG as default for files with no extension
+        if not '.' in filename:
+            filename += '.png'
+        else:
+            return '', 400  # Bad Request
     
     # Construct the full file path
     static_dir = os.path.join(os.path.dirname(__file__), 'static')

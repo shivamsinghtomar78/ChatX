@@ -9,6 +9,8 @@ Modern ChatGPT-style interface with React frontend and LangGraph backend.
 - Markdown rendering with syntax highlighting
 - Responsive design for mobile & desktop
 - PWA support - install as native app
+- Enhanced theme system with multiple options
+- Accessibility features for all users
 
 ### 💬 Chat Experience
 - Real-time AI chat with typing indicators
@@ -25,11 +27,13 @@ Modern ChatGPT-style interface with React frontend and LangGraph backend.
 
 ### 🛠️ Productivity Tools
 - Export chat to file
+- Advanced search with filtering and categorization
 - Search within conversations
 - Conversation templates
 - Generate chat summaries
 - Share conversations
 - Keyboard shortcuts (Ctrl+K)
+- Enhanced image gallery with slideshow and metadata
 
 ### 🤖 AI Capabilities
 - Calculator, web search, image generation
@@ -48,7 +52,7 @@ Modern ChatGPT-style interface with React frontend and LangGraph backend.
 - Install as mobile app
 - Offline support
 
-**See [FEATURES.md](FEATURES.md) for complete list of 37+ features!**
+**See [FEATURES.md](FEATURES.md) for complete list of 42+ features!**
 
 ## Quick Start
 

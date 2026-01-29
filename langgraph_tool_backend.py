@@ -1,6 +1,6 @@
 from langgraph.graph import StateGraph, START, END
 from typing import TypedDict, Annotated
-from langchain_core.messages import BaseMessage, HumanMessage
+from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph.message import add_messages
@@ -12,6 +12,9 @@ import sqlite3
 import requests
 import os
 from PIL import Image, ImageDraw, ImageFont
+
+# Multi-model provider for concurrent LLM racing
+from multi_model_provider import MultiModelProvider, race_models
 
 
 load_dotenv()
@@ -35,6 +38,8 @@ def validate_api_keys():
         validation_results['GOOGLE_API_KEY']['error'] = "GOOGLE_API_KEY not found in environment variables"
     elif not google_api_key.strip():
         validation_results['GOOGLE_API_KEY']['error'] = "GOOGLE_API_KEY is empty"
+    elif len(google_api_key.strip()) < 10:  # Basic length check
+        validation_results['GOOGLE_API_KEY']['error'] = "GOOGLE_API_KEY appears to be invalid (too short)"
     else:
         validation_results['GOOGLE_API_KEY']['valid'] = True
         validation_results['GOOGLE_API_KEY']['error'] = None
@@ -45,6 +50,8 @@ def validate_api_keys():
         validation_results['FREEPIK_API_KEY']['error'] = "FREEPIK_API_KEY not found in environment variables"
     elif not freepik_api_key.strip():
         validation_results['FREEPIK_API_KEY']['error'] = "FREEPIK_API_KEY is empty"
+    elif len(freepik_api_key.strip()) < 10:  # Basic length check
+        validation_results['FREEPIK_API_KEY']['error'] = "FREEPIK_API_KEY appears to be invalid (too short)"
     else:
         validation_results['FREEPIK_API_KEY']['valid'] = True
         validation_results['FREEPIK_API_KEY']['error'] = None
@@ -82,22 +89,33 @@ def print_api_key_validation_results():
 print_api_key_validation_results()
 
 # -------------------
-# 1. LLM
+# 1. LLM - Multi-Model Racing System
 # -------------------
-# Initialize LLM with error handling
+# Initialize multi-model provider (races 7 models concurrently)
+# First response wins - fastest model is used
+multi_model_provider = None
+llm = None
+
+try:
+    multi_model_provider = MultiModelProvider()
+    print("✓ Multi-Model Provider initialized (7 models ready to race)")
+except Exception as e:
+    print(f"✗ Failed to initialize Multi-Model Provider: {e}")
+    print("  Falling back to single Gemini model")
+
+# Keep Gemini as backup for tool binding
 try:
     llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", temperature=0.5)
-    print("✓ Google Generative AI LLM initialized successfully")
+    print("✓ Gemini LLM initialized (for tool binding)")
 except Exception as e:
-    print(f"✗ Failed to initialize Google Generative AI LLM: {e}")
-    print("  Some AI features may not work properly")
+    print(f"✗ Failed to initialize Gemini LLM: {e}")
 
 # -------------------
 # 2. Tools
 # -------------------
 # Tools
 try:
-    search_tool = DuckDuckGoSearchRun(region="us-en")
+    search_tool = DuckDuckGoSearchRun()
 except Exception as e:
     print(f"Search tool initialization failed: {e}")
     
@@ -117,7 +135,7 @@ def calculator(expression: str) -> str:
         if not expression or len(expression) > 100:
             return "Error: Invalid expression length"
         
-        # Simple and safe evaluation
+        # Simple and safe evaluation - use ast.literal_eval for safety
         allowed_chars = set('0123456789+-*/.() ')
         if not all(c in allowed_chars for c in expression):
             return "Error: Invalid characters in expression"
@@ -126,7 +144,31 @@ def calculator(expression: str) -> str:
         if '__' in expression or 'import' in expression:
             return "Error: Invalid expression"
         
-        result = eval(expression)
+        # Safe evaluation using compile with restricted mode
+        import ast
+        import operator
+        
+        # Define safe operators
+        ops = {
+            ast.Add: operator.add,
+            ast.Sub: operator.sub,
+            ast.Mult: operator.mul,
+            ast.Div: operator.truediv,
+            ast.USub: operator.neg
+        }
+        
+        def safe_eval(node):
+            if isinstance(node, ast.Num):
+                return node.n
+            elif isinstance(node, ast.BinOp):
+                return ops[type(node.op)](safe_eval(node.left), safe_eval(node.right))
+            elif isinstance(node, ast.UnaryOp):
+                return ops[type(node.op)](safe_eval(node.operand))
+            else:
+                raise ValueError("Unsupported operation")
+        
+        tree = ast.parse(expression, mode='eval')
+        result = safe_eval(tree.body)
         return f"Result: {expression} = {result}"
     except ZeroDivisionError:
         return "Error: Division by zero"
@@ -144,7 +186,10 @@ def get_stock_price(symbol: str) -> str:
     try:
         if not symbol or len(symbol) > 10:
             return "Error: Invalid stock symbol"
-        url = f"https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={symbol}&apikey=C9PE94QUEW9VWGFM"
+        
+        # Get API key from environment
+        alpha_vantage_key = os.getenv("ALPHA_VANTAGE_API_KEY", "demo")
+        url = f"https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={symbol}&apikey={alpha_vantage_key}"
         response = requests.get(url, timeout=10)
         response.raise_for_status()
         data = response.json()
@@ -234,6 +279,11 @@ def generate_image(user_prompt: str) -> str:
                 print(f"[ERROR] All emergency fallbacks failed for prompt: {user_prompt}")
                 return "I'm having trouble generating images right now. Please try again later."
         except Exception as fallback_error:
+            print(f"[CRITICAL] Image generation fallback error: {fallback_error}")
+            import traceback
+            print(f"[CRITICAL] Fallback traceback: {traceback.format_exc()}")
+            return "I'm having trouble generating images right now. Please try again later."
+
             print(f"[CRITICAL] Image generation fallback error: {fallback_error}")
             import traceback
             print(f"[CRITICAL] Fallback traceback: {traceback.format_exc()}")
@@ -330,7 +380,9 @@ def detect_image_style(prompt: str) -> str:
     
     # Return highest scoring style, or realistic as default
     if style_scores:
-        return max(style_scores, key=style_scores.get)
+        # Convert to list of (style, score) tuples and sort by score
+        sorted_styles = sorted(style_scores.items(), key=lambda x: x[1], reverse=True)
+        return sorted_styles[0][0] if sorted_styles else "realistic"
     
     return "realistic"
 
@@ -362,7 +414,7 @@ def generate_with_enhanced_api(optimized_prompt: str, filepath: str, original_pr
         print(f"[ERROR] All API generation methods failed: {e}")
         return create_enhanced_placeholder(filepath, original_prompt, optimized_prompt)
 
-def try_openai_generation(prompt: str, filepath: str) -> str:
+def try_openai_generation(prompt: str, filepath: str) -> str | None:
     """Try OpenAI DALL-E API"""
     try:
         openai_key = os.getenv("OPENAI_API_KEY")
@@ -378,22 +430,29 @@ def try_openai_generation(prompt: str, filepath: str) -> str:
             print("  Please set a valid OPENAI_API_KEY in your .env file.")
             return None
             
-        import openai
-        openai.api_key = openai_key
+        from openai import OpenAI
+        client = OpenAI(api_key=openai_key)
         
-        response = openai.Image.create(
+        response = client.images.generate(
             prompt=prompt[:1000],  # DALL-E prompt limit
             n=1,
             size="1024x1024"
         )
         
-        image_url = response['data'][0]['url']
-        
-        # Download and save image
-        import urllib.request
-        urllib.request.urlretrieve(image_url, filepath)
-        
-        return filepath
+        if response and response.data and len(response.data) > 0:
+            image_url = response.data[0].url
+            if image_url:
+                # Download and save image
+                import urllib.request
+                urllib.request.urlretrieve(image_url, filepath)
+                
+                return filepath
+            else:
+                print("[ERROR] No image URL in OpenAI response")
+                return None
+        else:
+            print("[ERROR] No image data in OpenAI response")
+            return None
         
     except Exception as e:
         print(f"OpenAI generation failed: {e}")
@@ -805,14 +864,35 @@ def create_enhanced_placeholder(filepath: str, original_prompt: str, optimized_p
 @tool
 def code_analyzer(code: str, language: str = "python") -> str:
     """
-    Analyze code for bugs, security issues, and improvements.
-    Supports Python, JavaScript, Java, C++.
+    Analyze code for bugs, security issues, and improvements using AI.
+    Supports Python, JavaScript, Java, C++, and more.
     """
     try:
+        # Use multi-model AI for real code analysis
+        if multi_model_provider is not None:
+            prompt = f"""Analyze the following {language} code for:
+1. Security vulnerabilities
+2. Bugs and potential issues
+3. Performance improvements
+4. Code style and best practices
+
+Code:
+```{language}
+{code[:2000]}
+```
+
+Provide a structured analysis with specific line references where applicable."""
+            
+            try:
+                response = multi_model_provider.race_models(prompt)
+                return f"# Code Analysis for {language}\n\n{response}"
+            except Exception as ai_error:
+                print(f"[code_analyzer] AI analysis failed: {ai_error}")
+        
+        # Fallback: Basic static analysis
         issues = []
         suggestions = []
         
-        # Basic code analysis
         if language.lower() == "python":
             if "eval(" in code:
                 issues.append("Security: Avoid using eval() - use ast.literal_eval() instead")
@@ -842,24 +922,32 @@ def code_analyzer(code: str, language: str = "python") -> str:
 @tool
 def data_analyst(data_query: str) -> str:
     """
-    Analyze data patterns, generate insights, and create data summaries.
+    Analyze data patterns, generate insights, and create data summaries using AI.
     Can process CSV data, statistics, and trends.
     """
     try:
-        # Simulate data analysis
-        analysis_types = {
-            "sales": "Sales data shows 15% growth YoY with peak in Q4",
-            "user": "User engagement increased 23% with mobile users leading", 
-            "revenue": "Revenue trends show consistent growth with seasonal patterns",
-            "performance": "System performance metrics indicate 99.5% uptime",
-            "market": "Market analysis reveals emerging opportunities in AI sector"
-        }
+        # Use multi-model AI for real data analysis
+        if multi_model_provider is not None:
+            prompt = f"""As a data analyst, provide insights and analysis for the following query:
+
+Query: {data_query}
+
+Provide:
+1. Key insights and patterns
+2. Statistical analysis recommendations
+3. Data visualization suggestions
+4. Actionable recommendations
+5. Potential data limitations
+
+Be specific and provide concrete examples where possible."""
+            
+            try:
+                response = multi_model_provider.race_models(prompt)
+                return f"# Data Analysis\n\n{response}"
+            except Exception as ai_error:
+                print(f"[data_analyst] AI analysis failed: {ai_error}")
         
-        query_lower = data_query.lower()
-        for key, insight in analysis_types.items():
-            if key in query_lower:
-                return f"Data Analysis Result:\n{insight}\n\nRecommendations:\n- Monitor trends closely\n- Implement data-driven strategies\n- Focus on high-performing segments"
-        
+        # Fallback: Basic template response
         return f"Data Analysis for '{data_query}':\nProcessed successfully. Key metrics extracted and trends identified. Consider implementing dashboard for real-time monitoring."
     except Exception as e:
         return f"Data analysis error: {str(e)}"
@@ -867,44 +955,33 @@ def data_analyst(data_query: str) -> str:
 @tool
 def business_consultant(business_query: str) -> str:
     """
-    Provide business strategy, market analysis, and growth recommendations.
+    Provide business strategy, market analysis, and growth recommendations using AI.
     Covers startup advice, scaling, marketing, and operations.
     """
     try:
-        query_lower = business_query.lower()
-        
-        if "startup" in query_lower or "launch" in query_lower:
-            return """Startup Strategy Recommendations:
-1. Validate your MVP with target customers
-2. Focus on product-market fit before scaling
-3. Build a strong founding team
-4. Secure adequate runway (18-24 months)
-5. Establish clear metrics and KPIs
+        # Use multi-model AI for real business consulting
+        if multi_model_provider is not None:
+            prompt = f"""As a senior business consultant, provide strategic advice for:
 
-Next Steps: Conduct market research and create a lean business model canvas."""
-        
-        elif "marketing" in query_lower:
-            return """Marketing Strategy Framework:
-1. Define target audience and personas
-2. Choose appropriate channels (digital/traditional)
-3. Create compelling value proposition
-4. Implement content marketing strategy
-5. Track ROI and optimize campaigns
+Query: {business_query}
 
-Recommended Tools: Google Analytics, social media platforms, email marketing."""
-        
-        elif "scale" in query_lower or "growth" in query_lower:
-            return """Scaling Strategy:
-1. Optimize core operations and processes
-2. Invest in technology and automation
-3. Build scalable team structure
-4. Expand to new markets/segments
-5. Maintain quality while growing
+Provide comprehensive guidance including:
+1. Strategic recommendations
+2. Market analysis insights
+3. Implementation roadmap
+4. Key metrics to track
+5. Potential risks and mitigation strategies
 
-Key Metrics: Customer acquisition cost, lifetime value, churn rate."""
+Be specific, actionable, and data-driven in your recommendations."""
+            
+            try:
+                response = multi_model_provider.race_models(prompt)
+                return f"# Business Consulting\n\n{response}"
+            except Exception as ai_error:
+                print(f"[business_consultant] AI consultation failed: {ai_error}")
         
-        else:
-            return f"Business Analysis for '{business_query}':\n\nKey Considerations:\n- Market positioning and competitive advantage\n- Revenue model optimization\n- Operational efficiency improvements\n- Risk management strategies\n\nRecommendation: Conduct SWOT analysis and develop 90-day action plan."
+        # Fallback: Basic template response
+        return f"Business Analysis for '{business_query}':\n\nKey Considerations:\n- Market positioning and competitive advantage\n- Revenue model optimization\n- Operational efficiency improvements\n- Risk management strategies\n\nRecommendation: Conduct SWOT analysis and develop 90-day action plan."
     except Exception as e:
         return f"Business consultation error: {str(e)}"
 
@@ -1749,7 +1826,30 @@ def create_placeholder_image(filepath: str, prompt_text: str) -> str | None:
 
 
 tools = [search_tool, get_stock_price, calculator, generate_image, code_analyzer, data_analyst, business_consultant, content_creator, project_manager, financial_advisor, legal_advisor, hr_specialist, cybersecurity_expert, knowledge_assistant]
-llm_with_tools = llm.bind_tools(tools)
+
+# Bind tools to LLM with error handling
+if llm is not None:
+    try:
+        llm_with_tools = llm.bind_tools(tools)
+    except Exception as e:
+        print(f"Error binding tools to LLM: {e}")
+        # Fallback to LLM without tools if binding fails
+        llm_with_tools = llm
+else:
+    # Create a dummy LLM response if LLM is not available
+    class DummyLLM:
+        def invoke(self, messages):
+            return "AI functionality is currently unavailable. Please check your API configuration."
+    
+    class DummyLLMWithTools:
+        def __init__(self):
+            self.llm = DummyLLM()
+        
+        def invoke(self, messages):
+            return self.llm.invoke(messages)
+    
+    llm_with_tools = DummyLLMWithTools()
+
 
 # -------------------
 # 3. State
@@ -1761,9 +1861,46 @@ class ChatState(TypedDict):
 # 4. Nodes
 # -------------------
 def chat_node(state: ChatState):
-    """LLM node that may answer or request a tool call."""
+    """
+    LLM node with multi-model concurrent racing.
+    Races 7 models (6 OpenRouter + Gemini) - first response wins.
+    Falls back to tool-enabled Gemini for tool calls.
+    """
     messages = state["messages"]
-    response = llm_with_tools.invoke(messages)
+    
+    # Check if this is a tool-call response (need Gemini for proper tool handling)
+    last_message = messages[-1] if messages else None
+    needs_tool_call = False
+    
+    # Simple heuristic: if user mentions specific tool-related keywords
+    if last_message and hasattr(last_message, 'content'):
+        content = last_message.content.lower() if isinstance(last_message.content, str) else ""
+        tool_keywords = ['calculate', 'search', 'stock', 'generate image', 'create image', 
+                        'code review', 'analyze code', 'business', 'legal', 'hr', 'finance']
+        needs_tool_call = any(kw in content for kw in tool_keywords)
+    
+    # Use llm_with_tools for tool calls, multi-model racing for general chat
+    if needs_tool_call and llm_with_tools is not None:
+        print("[ChatNode] Using Gemini with tools (tool keywords detected)")
+        response = llm_with_tools.invoke(messages)
+    elif multi_model_provider is not None:
+        # Race all models - first response wins
+        print("[ChatNode] Racing all models for fastest response...")
+        try:
+            response_content = multi_model_provider.race_models(messages)
+            # Wrap in AIMessage for LangGraph compatibility
+            response = AIMessage(content=response_content)
+        except Exception as e:
+            print(f"[ChatNode] Racing failed: {e}, falling back to Gemini")
+            if llm_with_tools is not None:
+                response = llm_with_tools.invoke(messages)
+            else:
+                response = AIMessage(content="AI functionality is currently unavailable.")
+    elif llm_with_tools is not None:
+        response = llm_with_tools.invoke(messages)
+    else:
+        response = AIMessage(content="AI functionality is currently unavailable. Please check your API configuration.")
+    
     return {"messages": [response]}
 
 tool_node = ToolNode(tools)
@@ -1797,5 +1934,7 @@ except Exception as e:
 def retrieve_all_threads():
     all_threads = set()
     for checkpoint in checkpointer.list(None):
-        all_threads.add(checkpoint.config["configurable"]["thread_id"])
+        # Safely access the configurable and thread_id keys
+        if "configurable" in checkpoint.config and "thread_id" in checkpoint.config["configurable"]:
+            all_threads.add(checkpoint.config["configurable"]["thread_id"])
     return list(all_threads)

@@ -1,14 +1,25 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { Search } from 'lucide-react';
+import { Search, SearchIcon, Sun, Moon, Monitor, Contrast, Palette } from 'lucide-react';
 import { Button } from "./components/ui/button";
 import { Input } from "./components/ui/input";
 import { Textarea } from "./components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./components/ui/dialog";
 import './App.css';
+import './App.responsive.css';
+import './responsive.css';
+import './components/AdvancedSearch.css';
+import ImprovedVirtualizedMessages from './components/ImprovedVirtualizedMessages';
+import AdvancedSearch from './components/AdvancedSearch';
+import SuggestionCard from './components/SuggestionCard';
+import ConversationItem from './components/ConversationItem';
+import ErrorBoundary from './components/ErrorBoundary';
+
+// Lazy load modals that are not immediately needed
+const TemplatesModal = lazy(() => import('./components/TemplatesModal'));
+const ShortcutsModal = lazy(() => import('./components/ShortcutsModal'));
+const ActionsModal = lazy(() => import('./components/ActionsModal'));
 
 const App = () => {
   const [conversations, setConversations] = useState([]);
@@ -35,15 +46,11 @@ const App = () => {
   const [showMoreActions, setShowMoreActions] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const [showToast, setShowToast] = useState({ show: false, message: '', type: '' });
-  const [virtualizedConversations, setVirtualizedConversations] = useState([]);
+  const [showAdvancedSearch, setShowAdvancedSearch] = useState(false); // New state for advanced search modal
+  const [showThemeSelector, setShowThemeSelector] = useState(false); // New state for theme selector
   const [isMobile, setIsMobile] = useState(false);
   
-  // Virtual scrolling state
-  const [visibleMessages, setVisibleMessages] = useState([]);
-  const [startIndex, setStartIndex] = useState(0);
-  const [endIndex, setEndIndex] = useState(20); // Initial buffer of 20 messages
-  const [loadingMore, setLoadingMore] = useState(false);
-
+  // Refs
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
   const sidebarRef = useRef(null);
@@ -51,6 +58,12 @@ const App = () => {
   const messagesContainerRef = useRef(null);
   const messageHeightCache = useRef({}); // Cache for message heights
   const speechRecognitionRef = useRef(null); // Ref for speech recognition instance
+  const skipLinkRef = useRef(null); // Ref for skip-to-content link
+
+  // Performance optimization: Memoize expensive calculations
+  const windowHeight = useMemo(() => {
+    return typeof window !== 'undefined' ? window.innerHeight : 600;
+  }, []);
 
   // Check if device is mobile
   useEffect(() => {
@@ -58,15 +71,19 @@ const App = () => {
       setIsMobile(window.innerWidth < 768);
     };
     
-    // Set initial value
     checkIsMobile();
     
+    let resizeTimer;
     const handleResize = () => {
-      checkIsMobile();
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(checkIsMobile, 150);
     };
 
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      clearTimeout(resizeTimer);
+    };
   }, []);
 
   // Close sidebar when clicking outside on mobile
@@ -166,13 +183,6 @@ const App = () => {
     });
   }, [conversations, searchTerm, searchFilter]);
 
-  // Virtualized conversation list for performance
-  useEffect(() => {
-    const startIndex = 0;
-    const endIndex = Math.min(startIndex + 50, filteredConversations.length);
-    setVirtualizedConversations(filteredConversations.slice(startIndex, endIndex));
-  }, [filteredConversations]);
-
   // Toast notification function
   const showToastMessage = useCallback((message, type = 'info') => {
     setShowToast({ show: true, message, type });
@@ -181,19 +191,65 @@ const App = () => {
     }, 3000);
   }, []);
 
-  // Theme effect
+  // Theme effect with system preference detection
   useEffect(() => {
-    const savedTheme = localStorage.getItem('chatx-theme') || 'dark';
-    setTheme(savedTheme);
-    document.body.className = savedTheme;
+    // Check for system preference
+    const getSystemTheme = () => {
+      if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        return 'dark';
+      }
+      return 'light';
+    };
+    
+    // Check for saved theme or use system preference
+    const savedTheme = localStorage.getItem('chatx-theme');
+    const systemTheme = getSystemTheme();
+    
+    // If no saved theme, use system preference
+    const initialTheme = savedTheme || systemTheme;
+    
+    setTheme(initialTheme);
+    document.body.className = initialTheme;
+    
+    // Listen for system theme changes
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleSystemThemeChange = (e) => {
+      // Only update if user hasn't set a specific theme
+      if (!localStorage.getItem('chatx-theme')) {
+        const newTheme = e.matches ? 'dark' : 'light';
+        setTheme(newTheme);
+        document.body.className = newTheme;
+      }
+    };
+    
+    mediaQuery.addEventListener('change', handleSystemThemeChange);
+    
+    return () => {
+      mediaQuery.removeEventListener('change', handleSystemThemeChange);
+    };
   }, []);
 
-  const toggleTheme = () => {
-    const newTheme = theme === 'dark' ? 'light' : 'dark';
+  // Enhanced theme switching with preview
+  const setThemeWithPreview = (newTheme) => {
+    // Apply theme immediately for preview
+    document.body.className = newTheme;
+  };
+
+  const confirmTheme = (newTheme) => {
     setTheme(newTheme);
     localStorage.setItem('chatx-theme', newTheme);
     document.body.className = newTheme;
+    setShowThemeSelector(false);
     showToastMessage(`Switched to ${newTheme} mode`, 'success');
+  };
+
+  const resetToSystemTheme = () => {
+    localStorage.removeItem('chatx-theme');
+    // Trigger a re-render to pick up system theme
+    const event = new Event('resize');
+    window.dispatchEvent(event);
+    setShowThemeSelector(false);
+    showToastMessage('Reset to system preference', 'success');
   };
 
   // Load saved data
@@ -253,14 +309,60 @@ const App = () => {
     }
   }, [activeConversation, showToastMessage]);
 
-  // Scroll to bottom effect
+  // Scroll to bottom effect with optimization
   const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (messagesEndRef.current) {
+      try {
+        messagesEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      } catch (err) {
+        messagesEndRef.current.scrollIntoView(false);
+      }
+    }
   }, []);
 
   useEffect(() => {
-    scrollToBottom();
+    const timer = setTimeout(scrollToBottom, 100);
+    return () => clearTimeout(timer);
   }, [activeConversation?.messages, scrollToBottom]);
+
+  // Focus management for accessibility
+  const handleSkipToContent = () => {
+    const messagesContainer = document.querySelector('.messages-container');
+    if (messagesContainer) {
+      messagesContainer.focus();
+    }
+  };
+
+  // Keyboard navigation enhancements
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Skip to content with Ctrl+Alt+S
+      if (e.ctrlKey && e.altKey && e.key === 'S') {
+        e.preventDefault();
+        handleSkipToContent();
+      }
+      
+      // Close modals with Escape key
+      if (e.key === 'Escape') {
+        if (showAdvancedSearch) {
+          setShowAdvancedSearch(false);
+        } else if (showTemplates) {
+          setShowTemplates(false);
+        } else if (showShortcuts) {
+          setShowShortcuts(false);
+        } else if (showMoreActions) {
+          setShowMoreActions(false);
+        } else if (showSearch) {
+          setShowSearch(false);
+        } else if (sidebarOpen && isMobile) {
+          setSidebarOpen(false);
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [showAdvancedSearch, showTemplates, showShortcuts, showMoreActions, showSearch, sidebarOpen, isMobile]);
 
   // Create new conversation
   const createNewConversation = useCallback(() => {
@@ -292,7 +394,7 @@ const App = () => {
     return firstMessage.length > 30 ? firstMessage.substring(0, 30) + '...' : firstMessage;
   }, []);
 
-  // Call API
+  // Call API with error handling
   const callAPI = useCallback(async (message, threadId) => {
     setIsTyping(true);
     setError(null);
@@ -325,7 +427,7 @@ const App = () => {
     }
   }, [showToastMessage]);
 
-  // Send message
+  // Send message with performance optimizations
   const sendMessage = useCallback(async () => {
     if (!message.trim()) return;
 
@@ -349,6 +451,7 @@ const App = () => {
       timestamp: new Date()
     };
 
+    // Optimized state update
     const updatedConv = {
       ...currentConv,
       messages: [...currentConv.messages, userMsg],
@@ -370,6 +473,7 @@ const App = () => {
       timestamp: new Date()
     };
 
+    // Optimized state update
     const finalConv = {
       ...updatedConv,
       messages: [...updatedConv.messages, aiMsg]
@@ -381,7 +485,7 @@ const App = () => {
     setActiveConversation(finalConv);
   }, [message, activeConversation, generateTitle, callAPI]);
 
-  // Handle key press
+  // Handle key press with optimization
   const handleKeyPress = useCallback((e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -393,25 +497,40 @@ const App = () => {
   const handleTextareaChange = useCallback((e) => {
     const value = e.target.value;
     setMessage(value);
-    e.target.style.height = 'auto';
-    e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
+    if (e.target) {
+      e.target.style.height = 'auto';
+      e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
+    }
     if (activeConversation) {
-      localStorage.setItem(`draft-${activeConversation.id}`, value);
+      try {
+        localStorage.setItem(`draft-${activeConversation.id}`, value);
+      } catch (err) {
+        console.warn('Failed to save draft:', err);
+      }
     }
   }, [activeConversation]);
 
   // Load draft
   useEffect(() => {
     if (activeConversation) {
-      const savedDraft = localStorage.getItem(`draft-${activeConversation.id}`);
-      if (savedDraft) setMessage(savedDraft);
+      try {
+        const savedDraft = localStorage.getItem(`draft-${activeConversation.id}`);
+        if (savedDraft) setMessage(savedDraft);
+      } catch (err) {
+        console.warn('Failed to load draft:', err);
+      }
     }
   }, [activeConversation?.id]);
 
   // Copy to clipboard
   const copyToClipboard = useCallback((text) => {
-    navigator.clipboard.writeText(text);
-    showToastMessage('Copied to clipboard', 'success');
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text)
+        .then(() => showToastMessage('Copied to clipboard', 'success'))
+        .catch(() => showToastMessage('Failed to copy', 'error'));
+    } else {
+      showToastMessage('Clipboard not supported', 'error');
+    }
   }, [showToastMessage]);
 
   // Export chat
@@ -474,8 +593,7 @@ const App = () => {
 
   // Voice input
   const startVoiceInput = useCallback(() => {
-    if (!('webkitSpeechRecognition' in window)) {
-      alert('Voice input not supported in this browser');
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
       showToastMessage('Voice input not supported in this browser', 'error');
       return;
     }
@@ -485,7 +603,8 @@ const App = () => {
       speechRecognitionRef.current.stop();
     }
     
-    const recognition = new window.webkitSpeechRecognition();
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
     speechRecognitionRef.current = recognition; // Store reference for cleanup
     
     recognition.continuous = false;
@@ -608,13 +727,70 @@ const App = () => {
       url: window.location.href
     };
     if (navigator.share) {
-      navigator.share(shareData);
-      showToastMessage('Conversation shared', 'success');
+      navigator.share(shareData)
+        .then(() => showToastMessage('Conversation shared', 'success'))
+        .catch(() => {
+          if (navigator.clipboard) {
+            navigator.clipboard.writeText(window.location.href)
+              .then(() => showToastMessage('Link copied to clipboard', 'success'))
+              .catch(() => showToastMessage('Failed to share', 'error'));
+          }
+        });
+    } else if (navigator.clipboard) {
+      navigator.clipboard.writeText(window.location.href)
+        .then(() => showToastMessage('Link copied to clipboard', 'success'))
+        .catch(() => showToastMessage('Failed to copy link', 'error'));
     } else {
-      navigator.clipboard.writeText(window.location.href);
-      showToastMessage('Link copied to clipboard', 'success');
+      showToastMessage('Sharing not supported', 'error');
     }
   }, [activeConversation, showToastMessage]);
+
+  // Handle search result selection
+  const handleSearchResultSelect = useCallback((result) => {
+    // If it's a conversation result, switch to that conversation
+    if (result.type === 'conversation') {
+      const conversation = conversations.find(conv => conv.id === result.conversationId);
+      if (conversation) {
+        setActiveConversation(conversation);
+        if (isMobile) {
+          setSidebarOpen(false);
+        }
+        setShowAdvancedSearch(false);
+        setSearchInChat(''); // Clear chat search
+        setShowSearch(false); // Hide chat search bar
+        return;
+      }
+    }
+    
+    // If it's a message result, switch to that conversation and scroll to the message
+    if (result.conversationId) {
+      const conversation = conversations.find(conv => conv.id === result.conversationId);
+      if (conversation) {
+        setActiveConversation(conversation);
+        if (isMobile) {
+          setSidebarOpen(false);
+        }
+        setShowAdvancedSearch(false);
+        
+        // Set up search in chat to highlight the term
+        setSearchInChat(searchTerm);
+        setShowSearch(true);
+        
+        // Scroll to the message after a short delay to allow UI to update
+        setTimeout(() => {
+          const messageElement = document.querySelector(`[data-message-id="${result.messageId}"]`);
+          if (messageElement) {
+            messageElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            // Add a temporary highlight effect
+            messageElement.classList.add('search-result-highlight');
+            setTimeout(() => {
+              messageElement.classList.remove('search-result-highlight');
+            }, 2000);
+          }
+        }, 300);
+      }
+    }
+  }, [conversations, isMobile, searchTerm]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -637,110 +813,7 @@ const App = () => {
     return () => window.removeEventListener('keydown', handleKeyboard);
   }, [isMobile]);
 
-  // Render message content
-  const renderMessageContent = useCallback((content) => {
-    if (content.includes('[IMAGE_GENERATED:')) {
-      const parts = content.split('[IMAGE_GENERATED:');
-      const beforeImage = parts[0];
-      const afterParts = parts[1].split(']');
-      const filename = afterParts[0];
-      const afterImage = afterParts[1] || '';
-      // Add timestamp to URL to prevent caching issues
-      const imageUrl = `/api/image/${filename}?t=${Date.now()}`;
-      
-      // Debug log to verify parsing
-      console.log('Rendering image:', { filename, imageUrl, content });
-      
-      return (
-        <div>
-          {beforeImage && <div className="image-container-before"><ReactMarkdown>{beforeImage}</ReactMarkdown></div>}
-          <div className="generated-image-container image-container">
-            <div className={`loading-indicator ${theme}`}>
-              <div>Loading image...</div>
-            </div>
-            <img 
-              src={imageUrl}
-              alt="Generated AI Image"
-              className={`generated-image ${theme}`}
-              onLoad={(e) => {
-                // Hide loading indicator and show image
-                const loadingIndicator = e.target.parentElement.querySelector('.loading-indicator');
-                if (loadingIndicator) {
-                  loadingIndicator.classList.add('hidden');
-                }
-                // Add loaded class to show image
-                e.target.classList.add('loaded');
-                console.log('Image loaded successfully');
-              }}
-              onError={(e) => {
-                // Hide loading indicator
-                const loadingIndicator = e.target.parentElement.querySelector('.loading-indicator');
-                if (loadingIndicator) {
-                  loadingIndicator.classList.add('hidden');
-                }
-                
-                console.log('Image failed to load:', e);
-                
-                // Create error message
-                const errorDiv = document.createElement('div');
-                errorDiv.className = `image-error ${theme} visible`;
-                errorDiv.innerHTML = `
-                  <div class="image-error-icon">⚠️</div>
-                  <div>Failed to load image</div>
-                  <div class="image-error-message">The generated image may not be available</div>
-                  <button class="image-error-retry-btn" onclick="window.location.reload()">
-                    Retry
-                  </button>
-                `;
-                e.target.parentElement.appendChild(errorDiv);
-              }}
-              loading="lazy"
-            />
-            <div className="image-actions">
-              <button 
-                onClick={() => {
-                  const link = document.createElement('a');
-                  link.href = `/api/image/${filename}`;
-                  link.download = filename;
-                  link.click();
-                }}
-                className="download-btn"
-              >
-                Download
-              </button>
-            </div>
-          </div>
-          {afterImage && <div className="image-container-after"><ReactMarkdown>{afterImage}</ReactMarkdown></div>}
-        </div>
-      );
-    }
-    
-    return (
-      <ReactMarkdown
-        components={{
-          code({node, inline, className, children, ...props}) {
-            const match = /language-(\w+)/.exec(className || '');
-            return !inline && match ? (
-              <SyntaxHighlighter
-                style={vscDarkPlus}
-                language={match[1]}
-                PreTag="div"
-                {...props}
-              >
-                {String(children).replace(/\n$/, '')}
-              </SyntaxHighlighter>
-            ) : (
-              <code className={className} {...props}>
-                {children}
-              </code>
-            );
-          }
-        }}
-      >
-        {content}
-      </ReactMarkdown>
-    );
-  }, [theme]);
+
 
   // Suggestions and templates
   const suggestions = useMemo(() => [
@@ -808,102 +881,24 @@ const App = () => {
     );
     
     // Update visible messages based on current indices
-    setVisibleMessages(filteredMessages.slice(startIndex, endIndex));
-  }, [activeConversation, searchInChat, startIndex, endIndex]);
+    // This useEffect is no longer needed with react-window implementation
+  }, [activeConversation, searchInChat]);
 
-  // Calculate message heights and update indices
-  const calculateVisibleMessages = useCallback(() => {
-    if (!activeConversation || !messagesContainerRef.current) return;
+  // Memoized filtered messages for the current conversation
+  const filteredMessages = useMemo(() => {
+    if (!activeConversation) return [];
     
-    const container = messagesContainerRef.current;
-    const scrollTop = container.scrollTop;
-    const containerHeight = container.clientHeight;
-    
-    const filteredMessages = activeConversation.messages.filter(msg => 
+    return activeConversation.messages.filter(msg => 
       !searchInChat || msg.content.toLowerCase().includes(searchInChat.toLowerCase())
     );
-    
-    // Calculate which messages are visible based on cached heights
-    let offsetTop = 0;
-    let newStartIndex = 0;
-    let newEndIndex = filteredMessages.length;
-    
-    // Find the first visible message
-    for (let i = 0; i < filteredMessages.length; i++) {
-      const msgId = filteredMessages[i].id;
-      const height = messageHeightCache.current[msgId] || 100; // Default height if not cached
-      
-      if (offsetTop + height > scrollTop) {
-        newStartIndex = Math.max(0, i - 5); // Add buffer
-        break;
-      }
-      offsetTop += height;
-    }
-    
-    // Find the last visible message
-    offsetTop = 0;
-    for (let i = newStartIndex; i < filteredMessages.length; i++) {
-      const msgId = filteredMessages[i].id;
-      const height = messageHeightCache.current[msgId] || 100;
-      
-      offsetTop += height;
-      if (offsetTop > scrollTop + containerHeight) {
-        newEndIndex = Math.min(filteredMessages.length, i + 5); // Add buffer
-        break;
-      }
-    }
-    
-    if (newStartIndex !== startIndex || newEndIndex !== endIndex) {
-      setStartIndex(newStartIndex);
-      setEndIndex(newEndIndex);
-    }
-  }, [activeConversation, searchInChat, startIndex, endIndex]);
+  }, [activeConversation, searchInChat]);
 
-  // Handle scroll events for virtual scrolling
-  const handleScroll = useCallback(() => {
-    calculateVisibleMessages();
-    
-    // Load more messages if we're near the top
-    const container = messagesContainerRef.current;
-    if (container && container.scrollTop < 100 && startIndex > 0 && !loadingMore) {
-      setLoadingMore(true);
-      // In a real implementation, this would fetch more messages from a server
-      setTimeout(() => setLoadingMore(false), 300);
-    }
-  }, [calculateVisibleMessages, startIndex, loadingMore]);
-
-  // Update message height cache when messages render
-  const updateMessageHeight = useCallback((msgId, height) => {
-    if (height > 0) {
-      messageHeightCache.current[msgId] = height;
-    }
-  }, []);
-
-  // Attach scroll listener
-  useEffect(() => {
-    const container = messagesContainerRef.current;
-    if (container) {
-      container.addEventListener('scroll', handleScroll);
-      return () => container.removeEventListener('scroll', handleScroll);
-    }
-  }, [handleScroll]);
-
-  // Recalculate visible messages when conversation or search changes
-  useEffect(() => {
-    if (activeConversation) {
-      calculateVisibleMessages();
-    }
-  }, [activeConversation, searchInChat, calculateVisibleMessages]);
-
-  // Generate search suggestions based on conversation data
-  const generateSearchSuggestions = useCallback((term) => {
-    if (!term) {
-      setSearchSuggestions([]);
-      return;
-    }
+  // Memoized search suggestions
+  const searchSuggestionsMemo = useMemo(() => {
+    if (!searchTerm) return [];
     
     const suggestions = new Set();
-    const lowerTerm = term.toLowerCase();
+    const lowerTerm = searchTerm.toLowerCase();
     
     // Add suggestions from conversation titles
     conversations.forEach(conv => {
@@ -930,18 +925,550 @@ const App = () => {
     });
     
     // Convert to array and limit to 5 suggestions
-    setSearchSuggestions(Array.from(suggestions).slice(0, 5));
-  }, [conversations]);
+    return Array.from(suggestions).slice(0, 5);
+  }, [conversations, searchTerm]);
+
+  // Generate search suggestions based on conversation data
+  const generateSearchSuggestions = useCallback((term) => {
+    if (!term) {
+      setSearchSuggestions([]);
+      return;
+    }
+    
+    setSearchSuggestions(searchSuggestionsMemo);
+  }, [searchSuggestionsMemo]);
+
+  // Missing handlers - Bug fixes
+  const handleTemplateSelect = useCallback((templateId) => {
+    const template = templates.find(t => t.title.toLowerCase().replace(/\s+/g, '_') === templateId);
+    if (template) {
+      setMessage(template.prompt);
+      setShowTemplates(false);
+      if (!activeConversation) {
+        createNewConversation();
+      }
+    }
+  }, [templates, activeConversation, createNewConversation]);
+
+  const handleVoiceInput = useCallback(() => {
+    if (isListening) {
+      if (speechRecognitionRef.current) {
+        speechRecognitionRef.current.stop();
+      }
+    } else {
+      startVoiceInput();
+    }
+  }, [isListening, startVoiceInput]);
+
+  const handleClearConversation = useCallback(() => {
+    clearChat();
+  }, [clearChat]);
+
+  const handleExportChat = useCallback(() => {
+    exportChat();
+  }, [exportChat]);
+
+  const handleKeyDown = useCallback((e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  }, [sendMessage]);
+
+  const handleSend = useCallback(() => {
+    sendMessage();
+  }, [sendMessage]);
+
+  const handleRegenerate = useCallback(() => {
+    regenerateResponse();
+  }, [regenerateResponse]);
+
+  const handleGenerateSummary = useCallback(() => {
+    generateSummary();
+  }, [generateSummary]);
+
+  const handleShareConversation = useCallback(() => {
+    shareConversation();
+  }, [shareConversation]);
+
+  const handleSearchKeyDown = useCallback((e) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setHighlightedSuggestion(prev => 
+        prev < searchSuggestions.length - 1 ? prev + 1 : prev
+      );
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setHighlightedSuggestion(prev => prev > 0 ? prev - 1 : -1);
+    } else if (e.key === 'Enter' && highlightedSuggestion >= 0) {
+      e.preventDefault();
+      setSearchTerm(searchSuggestions[highlightedSuggestion]);
+      setShowSuggestions(false);
+      setHighlightedSuggestion(-1);
+    }
+  }, [searchSuggestions, highlightedSuggestion]);
 
   return (
+    <ErrorBoundary>
     <div className={`app ${theme}`} role="main">
+      {/* Skip to content link for accessibility */}
+      <a 
+        href="#main-content" 
+        className="skip-to-content"
+        onClick={handleSkipToContent}
+        ref={skipLinkRef}
+      >
+        Skip to main content
+      </a>
+      
+      {/* Overlay for mobile sidebar */}
+      {isMobile && (
+        <div 
+          className={`overlay ${sidebarOpen ? 'active' : ''}`}
+          onClick={() => setSidebarOpen(false)}
+          aria-hidden="true"
+        ></div>
+      )}
+      
+      {/* Sidebar - Hidden by default on mobile */}
+      <div 
+        ref={sidebarRef}
+        className={`sidebar ${sidebarOpen ? 'open' : ''} ${theme}`}
+        role="navigation"
+        aria-label="Conversation navigation"
+      >
+        <div className={`sidebar-header ${theme}`}>
+          <button
+            onClick={createNewConversation}
+            className={`new-chat-btn ${theme}`}
+            aria-label="Create new conversation"
+          >
+            <span aria-hidden="true">+</span> New Chat
+          </button>
+        </div>
+        
+        <div className={`search-container ${theme}`}>
+          <div className="search-wrapper">
+            <SearchIcon className="search-icon" size={16} aria-hidden="true" />
+            <Input
+              type="text"
+              placeholder="Search conversations..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              onFocus={() => setShowSuggestions(true)}
+              onBlur={() => {
+                // Delay hiding suggestions to allow clicking on them
+                setTimeout(() => setShowSuggestions(false), 200);
+              }}
+              onKeyDown={handleSearchKeyDown}
+              className={`search-input ${theme}`}
+              aria-label="Search conversations"
+              aria-autocomplete="list"
+              aria-expanded={showSuggestions && searchSuggestions.length > 0}
+            />
+          </div>
+          
+          {showSuggestions && searchSuggestions.length > 0 && (
+            <div className={`search-suggestions ${theme}`} role="listbox">
+              {searchSuggestions.map((suggestion, index) => (
+                <div
+                  key={index}
+                  className={`search-suggestion-item ${theme} ${index === highlightedSuggestion ? 'highlighted' : ''}`}
+                  onClick={() => {
+                    setSearchTerm(suggestion);
+                    setShowSuggestions(false);
+                    setHighlightedSuggestion(-1);
+                  }}
+                  onMouseEnter={() => setHighlightedSuggestion(index)}
+                  role="option"
+                  aria-selected={index === highlightedSuggestion}
+                >
+                  {suggestion}
+                </div>
+              ))}
+            </div>
+          )}
+          
+          <select
+            value={searchFilter}
+            onChange={(e) => setSearchFilter(e.target.value)}
+            className={`search-filter-select ${theme}`}
+            aria-label="Search filter"
+          >
+            <option value="all">All</option>
+            <option value="title">Title</option>
+            <option value="content">Content</option>
+            <option value="metadata">Metadata</option>
+            <option value="timestamps">Timestamps</option>
+          </select>
+        </div>
+        
+        <div className="conversations-list-header">
+          <span>Recent Chats</span>
+        </div>
+        
+        <div 
+          className="conversations-list"
+          aria-label="Conversation list"
+        >
+          {filteredConversations.map((conversation) => (
+            <ConversationItem
+              key={conversation.id}
+              conversation={conversation}
+              isActive={activeConversation?.id === conversation.id}
+              onClick={() => {
+                setActiveConversation(conversation);
+                if (isMobile) {
+                  setSidebarOpen(false);
+                }
+              }}
+              onDelete={() => deleteConversation(conversation.id)}
+              theme={theme}
+              ref={el => conversationRefs.current[conversation.id] = el}
+            />
+          ))}
+          
+          {filteredConversations.length === 0 && searchTerm && (
+            <div className="conversation-empty-state">
+              <div className="conversation-empty-state-icon">🔍</div>
+              <p>No conversations found</p>
+            </div>
+          )}
+        </div>
+        
+        <div className={`user-profile ${theme}`}>
+          <div className="user-info">
+            <div className="user-avatar">{userAvatar}</div>
+            <div className="user-details">
+              <div className="user-name">You</div>
+              <div className="user-status">Online</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      {/* Main chat area */}
+      <div 
+        id="main-content"
+        className="chat-area"
+        tabIndex="-1"
+      >
+        {/* Header */}
+        <header className={`header ${theme}`} role="banner">
+          <div className="header-left">
+            <button
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="menu-btn"
+              aria-label={sidebarOpen ? "Close sidebar" : "Open sidebar"}
+              aria-expanded={sidebarOpen}
+            >
+              ☰
+            </button>
+            <div className="app-title">
+              <span className={`sparkle ${theme}`} aria-hidden="true">✨</span>
+              <h1>ChatX</h1>
+            </div>
+          </div>
+          
+          <div className="header-right">
+            {/* Theme Selector Button */}
+            <div className="theme-selector-container">
+              <button
+                onClick={() => setShowThemeSelector(!showThemeSelector)}
+                className={`theme-toggle ${theme}`}
+                aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+                aria-haspopup="true"
+                aria-expanded={showThemeSelector}
+              >
+                {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
+              </button>
+              
+              {/* Theme Selector Dropdown */}
+              {showThemeSelector && (
+                <div className={`theme-selector-dropdown ${theme}`}>
+                  <div className="theme-selector-header">
+                    <h3>Theme</h3>
+                    <button 
+                      className="close-theme-selector"
+                      onClick={() => setShowThemeSelector(false)}
+                      aria-label="Close theme selector"
+                    >
+                      ×
+                    </button>
+                  </div>
+                  
+                  <div className="theme-options">
+                    <button
+                      className={`theme-option ${theme === 'light' ? 'active' : ''}`}
+                      onClick={() => setThemeWithPreview('light')}
+                      onMouseEnter={() => setThemeWithPreview('light')}
+                      onMouseLeave={() => setThemeWithPreview(theme)}
+                      onDoubleClick={() => confirmTheme('light')}
+                    >
+                      <Sun size={16} />
+                      <span>Light</span>
+                    </button>
+                    
+                    <button
+                      className={`theme-option ${theme === 'dark' ? 'active' : ''}`}
+                      onClick={() => setThemeWithPreview('dark')}
+                      onMouseEnter={() => setThemeWithPreview('dark')}
+                      onMouseLeave={() => setThemeWithPreview(theme)}
+                      onDoubleClick={() => confirmTheme('dark')}
+                    >
+                      <Moon size={16} />
+                      <span>Dark</span>
+                    </button>
+                    
+                    <button
+                      className={`theme-option ${theme === 'high-contrast' ? 'active' : ''}`}
+                      onClick={() => setThemeWithPreview('high-contrast')}
+                      onMouseEnter={() => setThemeWithPreview('high-contrast')}
+                      onMouseLeave={() => setThemeWithPreview(theme)}
+                      onDoubleClick={() => confirmTheme('high-contrast')}
+                    >
+                      <Contrast size={16} />
+                      <span>High Contrast</span>
+                    </button>
+                    
+                    <button
+                      className={`theme-option ${theme === 'sepia' ? 'active' : ''}`}
+                      onClick={() => setThemeWithPreview('sepia')}
+                      onMouseEnter={() => setThemeWithPreview('sepia')}
+                      onMouseLeave={() => setThemeWithPreview(theme)}
+                      onDoubleClick={() => confirmTheme('sepia')}
+                    >
+                      <Palette size={16} />
+                      <span>Sepia</span>
+                    </button>
+                    
+                    <button
+                      className="theme-option system"
+                      onClick={resetToSystemTheme}
+                    >
+                      <Monitor size={16} />
+                      <span>System Default</span>
+                    </button>
+                  </div>
+                  
+                  <div className="theme-selector-footer">
+                    <button
+                      className="confirm-theme-btn"
+                      onClick={() => confirmTheme(theme)}
+                    >
+                      Apply Theme
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            <button
+              onClick={() => setShowAdvancedSearch(true)}
+              className="header-btn"
+              aria-label="Advanced search"
+            >
+              <Search size={20} />
+            </button>
+            
+            <button
+              onClick={() => setShowSearch(!showSearch)}
+              className={`header-btn ${showSearch ? 'active' : ''}`}
+              aria-label="Search in chat"
+              aria-expanded={showSearch}
+            >
+              🔍
+            </button>
+            
+            <button
+              onClick={() => setShowMoreActions(true)}
+              className="header-btn"
+              aria-label="More actions"
+            >
+              ⋮
+            </button>
+          </div>
+        </header>
+        
+        {/* Error Banner */}
+        {error && (
+          <div className={`error-banner ${theme}`} role="alert" aria-live="assertive">
+            <span>{error}</span>
+            <button 
+              onClick={() => setError(null)} 
+              aria-label="Close error message"
+            >
+              ×
+            </button>
+          </div>
+        )}
+        
+        {/* Search in Chat */}
+        {showSearch && (
+          <div className={`search-in-chat ${theme}`}>
+            <SearchIcon size={16} aria-hidden="true" />
+            <Input
+              type="text"
+              placeholder="Search in current chat..."
+              value={searchInChat}
+              onChange={(e) => setSearchInChat(e.target.value)}
+              className={`search-input ${theme}`}
+              aria-label="Search in current chat"
+            />
+            <button 
+              onClick={() => setShowSearch(false)}
+              aria-label="Close search"
+            >
+              ×
+            </button>
+          </div>
+        )}
+        
+        {/* Messages Container */}
+        <div 
+          ref={messagesContainerRef}
+          className="messages-container"
+          aria-label="Chat messages"
+          tabIndex="0"
+        >
+          {activeConversation ? (
+            <div className="messages">
+              <ImprovedVirtualizedMessages
+                messages={activeConversation.messages}
+                theme={theme}
+                reactions={reactions}
+                pinnedMessages={pinnedMessages}
+                isSpeaking={isSpeaking}
+                getRelativeTime={getRelativeTime}
+                speakText={speakText}
+                copyToClipboard={copyToClipboard}
+                togglePin={togglePin}
+                toggleReaction={toggleReaction}
+                showToastMessage={showToastMessage}
+                windowHeight={windowHeight - 200}
+              />
+              {isTyping && (
+                <div className={`message assistant ${theme}`}>
+                  <div className={`message-avatar ${theme}`} aria-label="AI Assistant">
+                    🤖
+                  </div>
+                  <div className={`message-content ${theme}`}>
+                    <div className={`message-card assistant ${theme}`}>
+                      <div className="message-card-content">
+                        <div className={`message-text ${theme}`}>
+                          <div className={`typing-indicator ${theme}`} aria-label="AI is typing">
+                            <span className="typing-dot"></span>
+                            <span className="typing-dot"></span>
+                            <span className="typing-dot"></span>
+                            <span className="typing-text">AI is typing...</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+          ) : (
+            <div className="welcome-screen">
+              <div className="welcome-screen-content">
+                <h2>Welcome to ChatX</h2>
+                <p>Start a new conversation or select an existing one to continue</p>
+                <div className="welcome-suggestions">
+                  <SuggestionCard 
+                    title="Code Review" 
+                    description="Get feedback on your code" 
+                    onClick={() => handleTemplateSelect('code_review')}
+                    theme={theme}
+                  />
+                  <SuggestionCard 
+                    title="Business Plan" 
+                    description="Create a comprehensive business plan" 
+                    onClick={() => handleTemplateSelect('business_plan')}
+                    theme={theme}
+                  />
+                  <SuggestionCard 
+                    title="Content Creator" 
+                    description="Generate engaging content" 
+                    onClick={() => handleTemplateSelect('content_creator')}
+                    theme={theme}
+                  />
+                  <SuggestionCard 
+                    title="Data Analysis" 
+                    description="Analyze data and provide insights" 
+                    onClick={() => handleTemplateSelect('data_analysis')}
+                    theme={theme}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+        
+        {/* Input Area */}
+        <div className={`input-area ${theme}`}>
+          <div className={`input-actions ${theme}`}>
+            <Button
+              onClick={handleVoiceInput}
+              className={`voice-btn ${isListening ? 'recording' : ''} ${theme}`}
+              aria-label={isListening ? "Stop voice input" : "Start voice input"}
+            >
+              {isListening ? '⏹' : '🎤'}
+            </Button>
+            
+            <Button
+              onClick={handleClearConversation}
+              className={`clear-btn ${theme}`}
+              aria-label="Clear conversation"
+            >
+              🗑
+            </Button>
+            
+            <Button
+              onClick={handleExportChat}
+              className={`export-btn ${theme}`}
+              aria-label="Export chat"
+            >
+              ⬇
+            </Button>
+            
+            <Button
+              onClick={() => setShowTemplates(true)}
+              className={`template-btn ${theme}`}
+              aria-label="Conversation templates"
+            >
+              📋
+            </Button>
+          </div>
+          
+          <div className={`input-container ${isFocused ? 'focused' : ''} ${theme}`}>
+            <Textarea
+              ref={textareaRef}
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              onKeyDown={handleKeyDown}
+              onFocus={() => setIsFocused(true)}
+              onBlur={() => setIsFocused(false)}
+              placeholder="Type your message..."
+              className={theme}
+              aria-label="Message input"
+            />
+            <Button
+              onClick={handleSend}
+              disabled={!message.trim() || isTyping}
+              className={`send-btn ${theme}`}
+              aria-label="Send message"
+            >
+              ↑
+            </Button>
+          </div>
+        </div>
+      </div>
+      
       {/* Toast Notification */}
       {showToast.show && (
-        <div 
-          className={`toast toast-${showToast.type}`}
-          role="alert"
-          aria-live="polite"
-        >
+        <div className={`toast toast-${showToast.type} ${theme}`}>
           <span>{showToast.message}</span>
           <button 
             onClick={() => setShowToast({ show: false, message: '', type: '' })}
@@ -951,640 +1478,55 @@ const App = () => {
           </button>
         </div>
       )}
-
-      {/* Overlay for mobile sidebar */}
-      {isMobile && sidebarOpen && (
-        <div 
-          className="overlay active"
-          onClick={() => setSidebarOpen(false)}
-          aria-hidden="true"
+      
+      {/* Modals */}
+      {showAdvancedSearch && (
+        <AdvancedSearch
+          conversations={conversations}
+          activeConversation={activeConversation}
+          theme={theme}
+          pinnedMessages={pinnedMessages}
+          reactions={reactions}
+          onClose={() => setShowAdvancedSearch(false)}
+          onResultSelect={handleSearchResultSelect}
         />
       )}
-
-      {/* Main Content Area */}
-      <div className="main-content">
-        {/* Sidebar - Hidden by default on mobile */}
-        <div 
-          className={`sidebar ${sidebarOpen ? 'open' : ''} ${theme}`}
-          ref={sidebarRef}
-          role="complementary"
-        >
-          <div className={`sidebar-header ${theme}`}>
-            <button 
-              onClick={createNewConversation} 
-              className={`new-chat-btn ${theme}`}
-              aria-label="Create new conversation"
-            >
-              <span aria-hidden="true">+</span> New Chat
-            </button>
-          </div>
-
-          <div className={`search-container ${theme}`}>
-            <div className="relative">
-              <Search className="absolute search-icon w-4 h-4" />
-              <Input
-                type="text"
-                placeholder="Search conversations..."
-                value={searchTerm}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  setSearchTerm(value);
-                  generateSearchSuggestions(value);
-                  setShowSuggestions(value.length > 0);
-                  setHighlightedSuggestion(-1);
-                }}
-                onKeyDown={(e) => {
-                  if (showSuggestions && searchSuggestions.length > 0) {
-                    if (e.key === 'ArrowDown') {
-                      e.preventDefault();
-                      setHighlightedSuggestion(prev => 
-                        prev < searchSuggestions.length - 1 ? prev + 1 : 0
-                      );
-                    } else if (e.key === 'ArrowUp') {
-                      e.preventDefault();
-                      setHighlightedSuggestion(prev => 
-                        prev > 0 ? prev - 1 : searchSuggestions.length - 1
-                      );
-                    } else if (e.key === 'Enter') {
-                      e.preventDefault();
-                      if (highlightedSuggestion >= 0) {
-                        setSearchTerm(searchSuggestions[highlightedSuggestion]);
-                        setShowSuggestions(false);
-                        setHighlightedSuggestion(-1);
-                      }
-                    } else if (e.key === 'Escape') {
-                      setShowSuggestions(false);
-                      setHighlightedSuggestion(-1);
-                    }
-                  }
-                }}
-                onFocus={() => {
-                  setShowSuggestions(searchTerm.length > 0);
-                  if (searchTerm.length > 0) {
-                    generateSearchSuggestions(searchTerm);
-                  }
-                }}
-                onBlur={() => setTimeout(() => {
-                  setShowSuggestions(false);
-                  setHighlightedSuggestion(-1);
-                }, 200)}
-                className="search-input"
-                aria-label="Search conversations"
-                aria-autocomplete="list"
-                aria-expanded={showSuggestions && searchSuggestions.length > 0}
-              />
-            </div>
-            {showSuggestions && searchSuggestions.length > 0 && (
-              <div className={`search-suggestions ${theme}`}>
-                {searchSuggestions.map((suggestion, index) => (
-                  <div
-                    key={index}
-                    className={`search-suggestion-item ${theme} ${
-                      index === highlightedSuggestion ? 'highlighted' : ''
-                    }`}
-                    onClick={() => {
-                      setSearchTerm(suggestion);
-                      setShowSuggestions(false);
-                      setHighlightedSuggestion(-1);
-                    }}
-                    onMouseDown={(e) => e.preventDefault()} // Prevent blur event
-                    onMouseEnter={() => setHighlightedSuggestion(index)}
-                  >
-                    {highlightText(suggestion, searchTerm)}
-                  </div>
-                ))}
-              </div>
-            )}
-            {searchTerm && (
-              <div className={`search-filters ${theme}`}>
-                <select 
-                  value={searchFilter}
-                  onChange={(e) => setSearchFilter(e.target.value)}
-                  className={`search-filter-select ${theme}`}
-                  aria-label="Search filter"
-                >
-                  <option value="all">All</option>
-                  <option value="title">Title</option>
-                  <option value="content">Content</option>
-                  <option value="metadata">Metadata</option>
-                  <option value="timestamps">Timestamps</option>
-                </select>
-              </div>
-            )}
-          </div>
-
-          <div 
-            className={`conversations-list ${theme}`}
-            role="list"
-          >
-            {virtualizedConversations.map((conv) => (
-              <div
-                key={conv.id}
-                className={`conversation-item ${activeConversation?.id === conv.id ? 'active' : ''} ${theme}`}
-                onClick={() => {
-                  setActiveConversation(conv);
-                  if (isMobile) {
-                    setSidebarOpen(false);
-                  }
-                }}
-                role="button"
-                tabIndex={0}
-                aria-label={`Select conversation: ${conv.title}`}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    setActiveConversation(conv);
-                    if (isMobile) {
-                      setSidebarOpen(false);
-                    }
-                  }
-                }}
-              >
-                <span className={`conversation-title ${theme}`}>
-                  {highlightText(conv.title, searchTerm)}
-                </span>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    deleteConversation(conv.id);
-                  }}
-                  className={`delete-btn ${theme}`}
-                  aria-label={`Delete conversation: ${conv.title}`}
-                >
-                  ×
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Chat Area - This is the main chat panel */}
-        <div className={`chat-area ${theme}`}>
-          {/* Header */}
-          <div className={`header ${theme}`}>
-            <div className={`header-left ${theme}`}>
-              <button 
-                onClick={() => setSidebarOpen(!sidebarOpen)} 
-                className={`menu-btn ${theme}`}
-                aria-label={sidebarOpen ? "Close sidebar" : "Open sidebar"}
-                aria-expanded={sidebarOpen}
-              >
-                ☰
-              </button>
-              <div className={`app-title ${theme}`}>
-                <span className={`sparkle ${theme}`} aria-hidden="true">✨</span>
-                <h1 className={`app-title-text ${theme}`}>ChatX</h1>
-              </div>
-            </div>
-            {activeConversation && (
-              <div className={`header-right ${theme}`}>
-                <button 
-                  onClick={toggleTheme} 
-                  className={`theme-btn ${theme}`} 
-                  title="Toggle theme"
-                  aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-                >
-                  {theme === 'dark' ? '☀️' : '🌙'}
-                </button>
-                <button 
-                  onClick={() => setShowSearch(!showSearch)} 
-                  className={`search-chat-btn ${theme}`} 
-                  title="Search in chat"
-                  aria-label="Search in chat"
-                  aria-expanded={showSearch}
-                >
-                  🔍
-                </button>
-                <button 
-                  onClick={() => setShowMoreActions(true)} 
-                  className={`more-actions-btn ${theme}`} 
-                  title="More actions"
-                  aria-label="More actions"
-                >
-                  ⋮
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Error Banner */}
-          {error && (
-            <div 
-              className={`error-banner ${theme}`}
-              role="alert"
-              aria-live="assertive"
-            >
-              <span>⚠️ {error}</span>
-              <button 
-                onClick={() => setError(null)}
-                className={`error-banner-close ${theme}`}
-                aria-label="Close error message"
-              >
-                ×
-              </button>
-            </div>
-          )}
-
-          {/* Search Bar */}
-          {showSearch && activeConversation && (
-            <div className={`search-in-chat ${theme}`}>
-              <Input
-                type="text"
-                placeholder="Search in this chat..."
-                value={searchInChat}
-                onChange={(e) => setSearchInChat(e.target.value)}
-                className={`search-chat-input ${theme}`}
-                aria-label="Search in current chat"
-              />
-              <button 
-                onClick={() => { setSearchInChat(''); setShowSearch(false); }}
-                className={`search-in-chat-close ${theme}`}
-                aria-label="Close search"
-              >
-                ×
-              </button>
-            </div>
-          )}
-
-          {/* Messages */}
-          <div 
-            className={`messages-container ${theme}`}
-            role="feed"
-            aria-label="Chat messages"
-            ref={messagesContainerRef}
-          >
-            {!activeConversation ? (
-              <div className={`welcome-screen ${theme}`}>
-                <div className={`welcome-content ${theme}`}>
-                  <h2 className={`welcome-title ${theme}`}>Welcome to ChatX</h2>
-                  <p className={`welcome-text ${theme}`}>Start a conversation to begin</p>
-                </div>
-                <div className={`suggestions-grid ${theme}`}>
-                  {suggestions.map((suggestion, index) => (
-                    <button
-                      key={index}
-                      onClick={() => {
-                        setMessage(suggestion);
-                        textareaRef.current?.focus();
-                      }}
-                      className={`suggestion-card ${theme}`}
-                      aria-label={`Use suggestion: ${suggestion}`}
-                    >
-                      {suggestion}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div className={`messages ${theme}`}>
-                {/* Spacer for messages before visible range */}
-                <div style={{ height: `${startIndex * 80}px` }} />
-                
-                {/* Visible messages */}
-                {visibleMessages.map((msg) => (
-                  <div 
-                    key={msg.id} 
-                    className={`message ${msg.role} ${theme}`}
-                    ref={el => {
-                      conversationRefs.current[msg.id] = el;
-                      // Update height cache when element renders
-                      if (el) {
-                        setTimeout(() => {
-                          updateMessageHeight(msg.id, el.offsetHeight);
-                        }, 0);
-                      }
-                    }}
-                  >
-                    <div 
-                      className={`message-avatar ${theme}`}
-                      aria-label={msg.role === 'user' ? "You" : "AI Assistant"}
-                    >
-                      {msg.role === 'user' ? '👤' : '🤖'}
-                    </div>
-                    <div className={`message-content ${theme}`}>
-                      <div className={`message-card ${msg.role} ${theme}`}>
-                        <div className="message-card-content">
-                          <div className={`message-text ${theme}`}>
-                            {renderMessageContent(msg.content)}
-                          </div>
-                        </div>
-                      </div>
-                      <div className={`message-footer ${theme}`}>
-                        <div className={`message-time ${theme}`}>
-                          {getRelativeTime(msg.timestamp)} {msg.edited && '(edited)'}
-                        </div>
-                        <div className={`message-actions ${theme}`}>
-                          {msg.role === 'assistant' && (
-                            <>
-                              <button 
-                                className={`msg-action-btn ${theme}`} 
-                                onClick={() => speakText(msg.content)} 
-                                title="Read aloud"
-                                aria-label="Read message aloud"
-                              >
-                                {isSpeaking ? '🔊' : '🔈'}
-                              </button>
-                              <button 
-                                className={`msg-action-btn ${theme}`} 
-                                onClick={() => copyToClipboard(msg.content)} 
-                                title="Copy"
-                                aria-label="Copy message to clipboard"
-                              >
-                                📋
-                              </button>
-                            </>
-                          )}
-                          <button 
-                            className={`msg-action-btn ${theme}`} 
-                            onClick={() => togglePin(msg.id)} 
-                            title="Pin"
-                            aria-label={pinnedMessages.includes(msg.id) ? "Unpin message" : "Pin message"}
-                          >
-                            {pinnedMessages.includes(msg.id) ? '📌' : '📍'}
-                          </button>
-                          <button 
-                            className={`msg-action-btn ${theme}`} 
-                            onClick={() => toggleReaction(msg.id, 'like')} 
-                            title="Like"
-                            aria-label={reactions[msg.id] === 'like' ? "Unlike message" : "Like message"}
-                          >
-                            {reactions[msg.id] === 'like' ? '👍' : '👎'}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                
-                {/* Spacer for messages after visible range */}
-                <div style={{ height: `${Math.max(0, (activeConversation.messages.filter(msg => 
-                  !searchInChat || msg.content.toLowerCase().includes(searchInChat.toLowerCase())
-                ).length - endIndex) * 80)}px` }} />
-                
-                {isTyping && (
-                  <div className={`message assistant ${theme}`}>
-                    <div 
-                      className={`message-avatar ${theme}`}
-                      aria-label="AI Assistant"
-                    >
-                      🤖
-                    </div>
-                    <div className={`message-content ${theme}`}>
-                      <div className={`typing-indicator ${theme}`}>
-                        <span className={`typing-dot ${theme}`}></span>
-                        <span className={`typing-dot ${theme}`}></span>
-                        <span className={`typing-dot ${theme}`}></span>
-                      </div>
-                      <div 
-                        className={`typing-text ${theme}`}
-                        aria-label="AI is typing"
-                      >
-                        AI is thinking...
-                      </div>
-                    </div>
-                  </div>
-                )}
-                <div 
-                  ref={messagesEndRef} 
-                  className={`messages-end ${theme}`}
-                  aria-hidden="true"
-                />
-              </div>
-            )}
-          </div>
-
-          {/* Input Area */}
-          <div className={`input-area ${theme}`}>
-            <div className={`input-actions ${theme}`}>
-              <Button 
-                onClick={() => setShowTemplates(!showTemplates)} 
-                className={`action-btn ${theme}`} 
-                title="Templates"
-                aria-label="Open templates"
-                variant="ghost"
-              >
-                📝
-              </Button>
-              <Button 
-                onClick={startVoiceInput} 
-                className={`action-btn ${theme} ${isListening ? 'active' : ''}`} 
-                title="Voice input"
-                aria-label={isListening ? "Stop listening" : "Start voice input"}
-                aria-pressed={isListening}
-                variant="ghost"
-              >
-                {isListening ? '🔴' : '🎤'}
-              </Button>
-            </div>
-            <div 
-              className={`input-container ${theme} ${isFocused ? 'focused' : ''}`}
-            >
-              <Textarea
-                ref={textareaRef}
-                value={message}
-                onChange={handleTextareaChange}
-                onKeyPress={handleKeyPress}
-                onFocus={() => setIsFocused(true)}
-                onBlur={() => setIsFocused(false)}
-                placeholder="Message ChatX... (Shift+Enter for new line)"
-                className={`message-input ${theme}`}
-                rows="1"
-                aria-label="Type your message"
-              />
-              <Button
-                onClick={sendMessage}
-                disabled={!message.trim() || isTyping}
-                className={`send-btn ${message.trim() && !isTyping ? 'active' : ''} ${theme}`}
-                aria-label="Send message"
-                aria-disabled={!message.trim() || isTyping}
-                variant="default"
-              >
-                {isTyping ? '⏳' : '➤'}
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Templates Modal */}
-      {showTemplates && (
-        <div 
-          className="modal-overlay" 
-          onClick={() => setShowTemplates(false)}
-          role="dialog"
-          aria-labelledby="templates-modal-title"
-          aria-modal="true"
-        >
-          <div 
-            className={`modal ${theme}`} 
-            onClick={(e) => e.stopPropagation()}
-            role="document"
-          >
-            <h2 id="templates-modal-title" className={`modal-title ${theme}`}>Conversation Templates</h2>
-            <div className={`templates-grid ${theme}`}>
-              {templates.map((template, idx) => (
-                <div 
-                  key={idx} 
-                  className={`template-card ${theme}`}
-                  onClick={() => {
-                    setMessage(template.prompt);
-                    setShowTemplates(false);
-                    textareaRef.current?.focus();
-                    showToastMessage('Template applied', 'success');
-                  }}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      setMessage(template.prompt);
-                      setShowTemplates(false);
-                      textareaRef.current?.focus();
-                      showToastMessage('Template applied', 'success');
-                    }
-                  }}
-                >
-                  <h3 className={`template-title ${theme}`}>{template.title}</h3>
-                  <p className={`template-description ${theme}`}>{template.prompt.substring(0, 60)}...</p>
-                </div>
-              ))}
-            </div>
-            <button 
-              className={`modal-close ${theme}`} 
-              onClick={() => setShowTemplates(false)}
-              aria-label="Close templates modal"
-            >
-              ×
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Keyboard Shortcuts Modal */}
-      {showShortcuts && (
-        <div 
-          className="modal-overlay" 
-          onClick={() => setShowShortcuts(false)}
-          role="dialog"
-          aria-labelledby="shortcuts-modal-title"
-          aria-modal="true"
-        >
-          <div 
-            className={`modal ${theme}`} 
-            onClick={(e) => e.stopPropagation()}
-            role="document"
-          >
-            <h2 id="shortcuts-modal-title" className={`modal-title ${theme}`}>Keyboard Shortcuts</h2>
-            <div className={`shortcuts-list ${theme}`}>
-              <div className={`shortcut-item ${theme}`}>
-                <kbd className={`kbd ${theme}`}>Ctrl</kbd> + <kbd className={`kbd ${theme}`}>K</kbd>
-                <span className={`shortcut-text ${theme}`}>Show shortcuts</span>
-              </div>
-              <div className={`shortcut-item ${theme}`}>
-                <kbd className={`kbd ${theme}`}>Enter</kbd>
-                <span className={`shortcut-text ${theme}`}>Send message</span>
-              </div>
-              <div className={`shortcut-item ${theme}`}>
-                <kbd className={`kbd ${theme}`}>Shift</kbd> + <kbd className={`kbd ${theme}`}>Enter</kbd>
-                <span className={`shortcut-text ${theme}`}>New line</span>
-              </div>
-              <div className={`shortcut-item ${theme}`}>
-                <kbd className={`kbd ${theme}`}>Esc</kbd>
-                <span className={`shortcut-text ${theme}`}>Close modals</span>
-              </div>
-            </div>
-            <button 
-              className={`modal-close ${theme}`} 
-              onClick={() => setShowShortcuts(false)}
-              aria-label="Close shortcuts modal"
-            >
-              ×
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* More Actions Modal */}
-      {showMoreActions && activeConversation && (
-        <div 
-          className="modal-overlay" 
-          onClick={() => setShowMoreActions(false)}
-          role="dialog"
-          aria-labelledby="actions-modal-title"
-          aria-modal="true"
-        >
-          <div 
-            className={`modal actions-modal ${theme}`} 
-            onClick={(e) => e.stopPropagation()}
-            role="document"
-          >
-            <h2 id="actions-modal-title" className={`modal-title ${theme}`}>Chat Actions</h2>
-            <div className={`actions-list ${theme}`}>
-              <button 
-                className={`action-item ${theme}`} 
-                onClick={() => { exportChat(); setShowMoreActions(false); }}
-                aria-label="Export chat"
-              >
-                <span className={`action-icon ${theme}`}>⬇️</span>
-                <div className={`action-content ${theme}`}>
-                  <span className={`action-title ${theme}`}>Export Chat</span>
-                  <span className={`action-desc ${theme}`}>Download conversation as text file</span>
-                </div>
-              </button>
-              <button 
-                className={`action-item ${theme}`} 
-                onClick={() => { clearChat(); setShowMoreActions(false); }}
-                aria-label="Clear chat"
-              >
-                <span className={`action-icon ${theme}`}>🗑️</span>
-                <div className={`action-content ${theme}`}>
-                  <span className={`action-title ${theme}`}>Clear Chat</span>
-                  <span className={`action-desc ${theme}`}>Remove all messages from this conversation</span>
-                </div>
-              </button>
-              <button 
-                className={`action-item ${theme}`} 
-                onClick={() => { regenerateResponse(); setShowMoreActions(false); }}
-                aria-label="Regenerate response"
-              >
-                <span className={`action-icon ${theme}`}>🔄</span>
-                <div className={`action-content ${theme}`}>
-                  <span className={`action-title ${theme}`}>Regenerate Response</span>
-                  <span className={`action-desc ${theme}`}>Get a new response for the last message</span>
-                </div>
-              </button>
-              <button 
-                className={`action-item ${theme}`} 
-                onClick={() => { generateSummary(); setShowMoreActions(false); }}
-                aria-label="Generate summary"
-              >
-                <span className={`action-icon ${theme}`}>📊</span>
-                <div className={`action-content ${theme}`}>
-                  <span className={`action-title ${theme}`}>Generate Summary</span>
-                  <span className={`action-desc ${theme}`}>Create a summary of this conversation</span>
-                </div>
-              </button>
-              <button 
-                className={`action-item ${theme}`} 
-                onClick={() => { shareConversation(); setShowMoreActions(false); }}
-                aria-label="Share conversation"
-              >
-                <span className={`action-icon ${theme}`}>🔗</span>
-                <div className={`action-content ${theme}`}>
-                  <span className={`action-title ${theme}`}>Share Conversation</span>
-                  <span className={`action-desc ${theme}`}>Share this conversation with others</span>
-                </div>
-              </button>
-            </div>
-            <button 
-              className={`modal-close ${theme}`} 
-              onClick={() => setShowMoreActions(false)}
-              aria-label="Close actions modal"
-            >
-              ×
-            </button>
-          </div>
-        </div>
-      )}
+      
+      <Suspense fallback={<div className="loading">Loading...</div>}>
+        {showTemplates && (
+          <TemplatesModal
+            isOpen={showTemplates}
+            onClose={() => setShowTemplates(false)}
+            onSelectTemplate={handleTemplateSelect}
+            theme={theme}
+          />
+        )}
+      </Suspense>
+      
+      <Suspense fallback={<div className="loading">Loading...</div>}>
+        {showShortcuts && (
+          <ShortcutsModal
+            isOpen={showShortcuts}
+            onClose={() => setShowShortcuts(false)}
+            theme={theme}
+          />
+        )}
+      </Suspense>
+      
+      <Suspense fallback={<div className="loading">Loading...</div>}>
+        {showMoreActions && (
+          <ActionsModal
+            isOpen={showMoreActions}
+            onClose={() => setShowMoreActions(false)}
+            onRegenerate={handleRegenerate}
+            onSummary={handleGenerateSummary}
+            onShare={handleShareConversation}
+            theme={theme}
+          />
+        )}
+      </Suspense>
     </div>
+    </ErrorBoundary>
   );
 };
 
