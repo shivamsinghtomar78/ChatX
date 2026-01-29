@@ -16,9 +16,21 @@ CORS(app, resources={
     r"/api/*": {
         "origins": ALLOWED_ORIGINS,
         "methods": ["GET", "POST"],
-        "allow_headers": ["Content-Type", "X-Requested-With"]
+        "allow_headers": ["Content-Type", "X-Requested-With"],
+        "max_age": 86400
     }
 })
+
+# Security headers
+@app.after_request
+def add_security_headers(response):
+    """Add security headers to all responses"""
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    response.headers['Permissions-Policy'] = 'geolocation=(), microphone=(), camera=()'
+    return response
 
 # Simple rate limiting
 rate_limit_store = {}
