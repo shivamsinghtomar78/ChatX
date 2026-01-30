@@ -16,15 +16,21 @@ static_folder = os.path.join(BASE_DIR, 'static')
 app = Flask(__name__, static_folder=static_folder)
 
 # Read allowed origins from environment (comma-separated) or use defaults
-ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:3001").split(",")
-ALLOWED_ORIGINS = [origin.strip() for origin in ALLOWED_ORIGINS if origin.strip()]
+ALLOWED_ORIGINS_RAW = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:3001")
+print(f"[CORS] Configured ALLOWED_ORIGINS: {ALLOWED_ORIGINS_RAW}")
+
+if ALLOWED_ORIGINS_RAW == "*":
+    ALLOWED_ORIGINS = "*"
+else:
+    ALLOWED_ORIGINS = [origin.strip() for origin in ALLOWED_ORIGINS_RAW.split(",") if origin.strip()]
 
 # Configure CORS with environment-based origins
 CORS(app, resources={
     r"/api/*": {
         "origins": ALLOWED_ORIGINS,
-        "methods": ["GET", "POST"],
-        "allow_headers": ["Content-Type", "X-Requested-With"],
+        "methods": ["GET", "POST", "OPTIONS"],
+        "allow_headers": ["Content-Type", "X-Requested-With", "Authorization"],
+        "supports_credentials": True,
         "max_age": 86400
     }
 })
