@@ -30,6 +30,7 @@ class ModelConfig:
     model_id: str
     priority: int  # Lower = higher priority
     enabled: bool = True
+    cooldown_until: float = 0.0  # epoch time
     
     # Stats tracking
     total_requests: int = field(default=0, repr=False)
@@ -218,6 +219,11 @@ class MultiModelProvider:
                         print(f"[MultiModel] ✓ {model.name} responded in {elapsed:.2f}s")
                         return content
             
+            if response.status_code == 429:
+                print(f"[MultiModel] ✗ {model.name} hit quota (429). Cooling down for 5 mins.")
+                model.cooldown_until = time.time() + 300
+                return None
+                
             print(f"[MultiModel] ✗ {model.name} failed: HTTP {response.status_code}")
             return None
             
@@ -277,7 +283,14 @@ class MultiModelProvider:
                 return None
             
             if exception[0]:
-                print(f"[MultiModel] ✗ {model.name} error: {exception[0]}")
+                err_msg = str(exception[0])
+                print(f"[MultiModel] ✗ {model.name} error: {err_msg}")
+                
+                # Check for quota errors (429)
+                if "429" in err_msg or "ResourceExhausted" in err_msg or "quota" in err_msg.lower():
+                    print(f"!!! [MultiModel] {model.name} hit quota limits. Cooling down for 5 mins.")
+                    model.cooldown_until = time.time() + 300  # 5 minute cooldown
+                    
                 return None
             
             if result[0]:
@@ -321,7 +334,11 @@ class MultiModelProvider:
         # Convert messages to standard format
         std_messages = self._standardize_messages(messages)
         
-        enabled_models = [m for m in self.models if m.enabled]
+        current_time = time.time()
+        enabled_models = [
+            m for m in self.models 
+            if m.enabled and m.cooldown_until <= current_time
+        ]
         
         if not enabled_models:
             return "Error: No models are enabled. Please check your API keys."
