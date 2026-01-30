@@ -17,7 +17,7 @@ app = Flask(__name__, static_folder=static_folder)
 
 # Read allowed origins from environment (comma-separated) or use defaults
 # DEFAULT to '*' for production to prevent CORS blocks even if environment vars fail
-ALLOWED_ORIGINS_RAW = os.getenv("ALLOWED_ORIGINS", "*,https://chat-hsc8qgfca-shivamsinghtomar78s-projects.vercel.app,http://localhost:3000,http://localhost:3001")
+ALLOWED_ORIGINS_RAW = os.getenv("ALLOWED_ORIGINS", "*,https://chat-oisandgcv-shivamsinghtomar78s-projects.vercel.app,https://chat-hsc8qgfca-shivamsinghtomar78s-projects.vercel.app,http://localhost:3000,http://localhost:3001")
 print(f"[CORS] Final ALLOWED_ORIGINS config: {ALLOWED_ORIGINS_RAW}")
 
 if ALLOWED_ORIGINS_RAW == "*" or "*" in ALLOWED_ORIGINS_RAW.split(","):
