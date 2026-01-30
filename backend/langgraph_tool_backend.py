@@ -105,7 +105,7 @@ except Exception as e:
 
 # Keep Gemini as backup for tool binding
 try:
-    llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", temperature=0.5)
+    llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", temperature=0.5, max_retries=0)
     print("✓ Gemini LLM initialized (for tool binding)")
 except Exception as e:
     print(f"✗ Failed to initialize Gemini LLM: {e}")

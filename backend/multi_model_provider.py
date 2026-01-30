@@ -166,7 +166,8 @@ class MultiModelProvider:
             from langchain_google_genai import ChatGoogleGenerativeAI
             self._gemini_llm = ChatGoogleGenerativeAI(
                 model="gemini-2.0-flash",
-                temperature=0.5
+                temperature=0.5,
+                max_retries=0  # CRITICAL: Prevent infinite retry loops on fatal errors (e.g. leaked key)
             )
             print("✓ Gemini LLM initialized via LangChain")
         except Exception as e:

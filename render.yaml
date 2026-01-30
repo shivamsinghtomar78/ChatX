@@ -4,7 +4,7 @@ services:
     runtime: python
     rootDir: backend
     buildCommand: "bash build.sh"
-    startCommand: "gunicorn app:app"
+    startCommand: "gunicorn -t 120 app:app"
     envVars:
       - key: FLASK_APP
         value: app.py
