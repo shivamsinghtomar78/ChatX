@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import API_BASE_URL from '../apiConfig';
 import { X, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Play, Pause, Download, Maximize } from 'lucide-react';
 import { Button } from './ui/button';
 
@@ -127,7 +128,7 @@ const ImageGallery = ({
 
   // Handle view full size
   const handleViewFullSize = useCallback((filename) => {
-    window.open(`/api/image/${filename}`, '_blank');
+    window.open(`${API_BASE_URL}/api/image/${filename}`, '_blank');
   }, []);
 
   // Thumbnail click handler
@@ -162,7 +163,7 @@ const ImageGallery = ({
               </div>
             ) : (
               <img
-                src={`/api/image/${image.filename}?t=${Date.now()}`}
+                src={`${API_BASE_URL}/api/image/${image.filename}?t=${Date.now()}`}
                 alt={`Thumbnail ${index + 1}`}
                 className={`thumbnail-image ${theme}`}
                 onError={() => handleImageError(index)}
@@ -332,7 +333,7 @@ const ImageGallery = ({
               </div>
             ) : (
               <img
-                src={`/api/image/${currentImage.filename}?t=${Date.now()}`}
+                src={`${API_BASE_URL}/api/image/${currentImage.filename}?t=${Date.now()}`}
                 alt={currentImage.prompt || `Image ${currentIndex + 1}`}
                 className="gallery-image"
                 style={{ transform: `scale(${zoomLevel})` }}

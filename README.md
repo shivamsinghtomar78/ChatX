@@ -54,6 +54,21 @@ Modern ChatGPT-style interface with React frontend and LangGraph backend.
 
 **See [FEATURES.md](FEATURES.md) for complete list of 42+ features!**
 
+## Deployment (Vercel + Render)
+
+To separate the frontend and backend:
+
+### 1. Backend (Render)
+- Connect this repo to Render.
+- **Runtime**: Python.
+- **Start Command**: `gunicorn app:app`.
+- **Env Vars**: Set `ALLOWED_ORIGINS` to `*` or your Vercel URL.
+
+### 2. Frontend (Vercel)
+- Root directory should be `frontend`.
+- **Framework**: Create React App.
+- **Env Vars**: Set `REACT_APP_API_URL` to your Render URL.
+
 ## Quick Start
 
 ### 1. Backend

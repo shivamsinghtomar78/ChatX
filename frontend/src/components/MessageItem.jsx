@@ -1,4 +1,5 @@
 import React, { memo, useCallback, useState, useMemo } from 'react';
+import API_BASE_URL from '../apiConfig';
 import ReactMarkdown from 'react-markdown';
 import { Card } from './ui/card';
 import { Button } from './ui/button';
@@ -60,7 +61,7 @@ const MessageItem = memo(({
                   <div>Loading image...</div>
                 </div>
                 <img
-                  src={`/api/image/${images[0].filename}?t=${Date.now()}`}
+                  src={`${API_BASE_URL}/api/image/${images[0].filename}?t=${Date.now()}`}
                   alt="Generated content"
                   className={`generated-image ${theme}`}
                   onLoad={(e) => {
@@ -105,7 +106,7 @@ const MessageItem = memo(({
                   <button
                     onClick={() => {
                       const link = document.createElement('a');
-                      link.href = `/api/image/${images[0].filename}`;
+                      link.href = `${API_BASE_URL}/api/image/${images[0].filename}`;
                       link.download = images[0].filename;
                       link.click();
                     }}
@@ -117,7 +118,7 @@ const MessageItem = memo(({
                   <button
                     onClick={() => {
                       // Open image in new tab
-                      window.open(`/api/image/${images[0].filename}`, '_blank');
+                      window.open(`${API_BASE_URL}/api/image/${images[0].filename}`, '_blank');
                     }}
                     className="download-btn"
                     aria-label="View full size"
@@ -141,7 +142,7 @@ const MessageItem = memo(({
                       }}
                     >
                       <img
-                        src={`/api/image/${image.filename}?t=${Date.now()}`}
+                        src={`${API_BASE_URL}/api/image/${image.filename}?t=${Date.now()}`}
                         alt={`Generated thumbnail ${index + 1}`}
                         className={`gallery-image ${theme}`}
                         loading="lazy"
@@ -203,7 +204,7 @@ const MessageItem = memo(({
   // Handle image download
   const handleImageDownload = useCallback((filename) => {
     const link = document.createElement('a');
-    link.href = `/api/image/${filename}`;
+    link.href = `${API_BASE_URL}/api/image/${filename}`;
     link.download = filename;
     link.click();
   }, []);

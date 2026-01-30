@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
+import API_BASE_URL from '../apiConfig';
 
 /**
  * Custom hook to manage chat messaging
@@ -23,7 +24,7 @@ export const useChat = (activeConversation, updateConversation, createConversati
         setError(null);
 
         try {
-            const response = await fetch('/api/chat', {
+            const response = await fetch(`${API_BASE_URL}/api/chat`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
