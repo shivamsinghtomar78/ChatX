@@ -16,21 +16,22 @@ static_folder = os.path.join(BASE_DIR, 'static')
 app = Flask(__name__, static_folder=static_folder)
 
 # Read allowed origins from environment (comma-separated) or use defaults
-ALLOWED_ORIGINS_RAW = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:3001")
-print(f"[CORS] Configured ALLOWED_ORIGINS: {ALLOWED_ORIGINS_RAW}")
+# DEFAULT to '*' for production to prevent CORS blocks even if environment vars fail
+ALLOWED_ORIGINS_RAW = os.getenv("ALLOWED_ORIGINS", "*,https://chat-hsc8qgfca-shivamsinghtomar78s-projects.vercel.app,http://localhost:3000,http://localhost:3001")
+print(f"[CORS] Final ALLOWED_ORIGINS config: {ALLOWED_ORIGINS_RAW}")
 
-if ALLOWED_ORIGINS_RAW == "*":
+if ALLOWED_ORIGINS_RAW == "*" or "*" in ALLOWED_ORIGINS_RAW.split(","):
     ALLOWED_ORIGINS = "*"
 else:
     ALLOWED_ORIGINS = [origin.strip() for origin in ALLOWED_ORIGINS_RAW.split(",") if origin.strip()]
 
 # Configure CORS with environment-based origins
+# Note: supports_credentials=False (default) is safer for wildcard origins
 CORS(app, resources={
     r"/api/*": {
         "origins": ALLOWED_ORIGINS,
         "methods": ["GET", "POST", "OPTIONS"],
         "allow_headers": ["Content-Type", "X-Requested-With", "Authorization"],
-        "supports_credentials": True,
         "max_age": 86400
     }
 })
@@ -83,9 +84,15 @@ def get_chatbot():
         chatbot = cb
     return chatbot
 
-@app.route('/api/chat', methods=['POST'])
+@app.route('/api/chat', methods=['POST', 'OPTIONS'])
 @rate_limit(max_requests=20, window=60)
 def chat():
+    # Log incoming request for diagnostics
+    print(f"[DEBUG] Received {request.method} request to /api/chat from {request.remote_addr}")
+    if request.method == 'OPTIONS':
+        print(f"[DEBUG] Preflight headers: {dict(request.headers)}")
+        return '', 204
+        
     try:
         data = request.json or {}
         message = data.get('message', '')
