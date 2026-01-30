@@ -1,4 +1,4 @@
-import React, { memo, useCallback, useMemo, useRef, useEffect } from 'react';
+import React, { memo, useCallback, useRef, useEffect } from 'react';
 import { VariableSizeList as List } from 'react-window';
 import MessageItem from './MessageItem';
 import './ImprovedVirtualizedMessages.css';
@@ -76,7 +76,7 @@ const ImprovedVirtualizedMessages = memo(({
     // Cache the calculated height
     itemHeightCache.current.set(index, finalHeight);
     return finalHeight;
-  }, [messages, theme]);
+  }, [messages]);
 
   // Reset height cache when messages change significantly
   const resetHeightCache = useCallback(() => {

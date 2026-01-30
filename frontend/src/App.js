@@ -24,7 +24,7 @@ const ActionsModal = lazy(() => import('./components/ActionsModal'));
 const App = () => {
   // Custom Hooks
   const { toast, showToast, hideToast } = useToast();
-  const { theme, setTheme } = useTheme();
+  const { theme } = useTheme();
   const { isMobile, windowHeight } = useMobile();
   const { copy } = useClipboard(showToast);
   const {
@@ -49,8 +49,7 @@ const App = () => {
     message,
     setMessage,
     isTyping,
-    sendMessage,
-    regenerateResponse
+    sendMessage
   } = useChat(
     activeConversation,
     updateConversation,

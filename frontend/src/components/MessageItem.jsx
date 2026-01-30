@@ -26,18 +26,6 @@ const MessageItem = memo(({
   const [initialGalleryIndex, setInitialGalleryIndex] = useState(0);
 
   // Helper function to highlight search terms
-  const highlightText = useCallback((text, searchTerm) => {
-    if (!searchTerm) return text;
-
-    const regex = new RegExp(`(${searchTerm})`, 'gi');
-    const parts = text.split(regex);
-
-    return parts.map((part, index) =>
-      regex.test(part) ?
-        <mark key={index} className="search-highlight">{part}</mark> :
-        part
-    );
-  }, []);
 
   // Render message content with improved image handling
   const renderMessageContent = useCallback((content) => {
@@ -73,7 +61,7 @@ const MessageItem = memo(({
                 </div>
                 <img
                   src={`/api/image/${images[0].filename}?t=${Date.now()}`}
-                  alt="Generated AI Image"
+                  alt="Generated content"
                   className={`generated-image ${theme}`}
                   onLoad={(e) => {
                     // Hide loading indicator and show image
@@ -154,7 +142,7 @@ const MessageItem = memo(({
                     >
                       <img
                         src={`/api/image/${image.filename}?t=${Date.now()}`}
-                        alt={`Generated AI Image ${index + 1}`}
+                        alt={`Generated thumbnail ${index + 1}`}
                         className={`gallery-image ${theme}`}
                         loading="lazy"
                       />

@@ -2,9 +2,9 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { X, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Play, Pause, Download, Maximize } from 'lucide-react';
 import { Button } from './ui/button';
 
-const ImageGallery = ({ 
-  images, 
-  theme, 
+const ImageGallery = ({
+  images,
+  theme,
   initialIndex = 0,
   onClose,
   onDownload
@@ -19,7 +19,7 @@ const ImageGallery = ({
 
   // Current image data
   const currentImage = images[currentIndex];
-  
+
   // Auto-play timer
   useEffect(() => {
     let timer;
@@ -75,9 +75,6 @@ const ImageGallery = ({
     setCurrentIndex(prev => (prev + 1) % images.length);
   }, [images.length]);
 
-  const goToImage = useCallback((index) => {
-    setCurrentIndex(index);
-  }, []);
 
   // Zoom functions
   const zoomIn = useCallback(() => {
@@ -189,7 +186,7 @@ const ImageGallery = ({
       <div className={`metadata-panel ${theme} ${showMetadata ? 'expanded' : ''}`}>
         <div className="metadata-header">
           <h3>Image Information</h3>
-          <button 
+          <button
             className={`metadata-toggle ${theme}`}
             onClick={() => setShowMetadata(prev => !prev)}
           >
@@ -237,7 +234,7 @@ const ImageGallery = ({
   return (
     <div className={`image-gallery-modal ${theme}`}>
       <div className="gallery-overlay" onClick={onClose}></div>
-      
+
       <div className="gallery-container">
         {/* Header with controls */}
         <div className={`gallery-header ${theme}`}>
@@ -264,7 +261,7 @@ const ImageGallery = ({
             >
               <ZoomIn className="w-4 h-4" />
             </Button>
-            
+
             <div className="playback-controls">
               <Button
                 variant="ghost"
@@ -287,7 +284,7 @@ const ImageGallery = ({
                 </select>
               )}
             </div>
-            
+
             <Button
               variant="ghost"
               size="sm"
@@ -342,7 +339,7 @@ const ImageGallery = ({
                 onError={() => handleImageError(currentIndex)}
               />
             )}
-            
+
             {/* Error state */}
             {false && ( // In a real implementation, we would check for actual errors
               <div className={`image-error-state ${theme}`}>
@@ -369,9 +366,9 @@ const ImageGallery = ({
         {/* Progress indicator for slideshow */}
         {isPlaying && (
           <div className={`slideshow-progress ${theme}`}>
-            <div 
+            <div
               className="progress-bar"
-              style={{ 
+              style={{
                 animationDuration: `${playbackSpeed}ms`,
                 animationPlayState: isPlaying ? 'running' : 'paused'
               }}
