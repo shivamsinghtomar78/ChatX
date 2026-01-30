@@ -5,10 +5,10 @@ import os
 from functools import wraps
 from time import time
 
-# Resolve static folder using absolute path to ensure reliability across environments
+# Resolve static folder for images
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-static_folder = os.path.join(BASE_DIR, 'frontend', 'build')
-app = Flask(__name__, static_folder=static_folder, static_url_path='/')
+static_folder = os.path.join(BASE_DIR, 'static')
+app = Flask(__name__, static_folder=static_folder)
 
 # Read allowed origins from environment (comma-separated) or use defaults
 ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:3001").split(",")

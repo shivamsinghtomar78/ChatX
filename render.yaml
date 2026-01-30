@@ -2,6 +2,7 @@ services:
   - type: web
     name: chatx
     runtime: python
+    rootDir: backend
     buildCommand: "bash build.sh"
     startCommand: "gunicorn app:app"
     envVars:
