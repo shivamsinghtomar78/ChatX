@@ -84,14 +84,11 @@ def get_chatbot():
         chatbot = cb
     return chatbot
 
-@app.route('/api/chat', methods=['POST', 'OPTIONS'])
+@app.route('/api/chat', methods=['POST'])
 @rate_limit(max_requests=20, window=60)
 def chat():
     # Log incoming request for diagnostics
     print(f"[DEBUG] Received {request.method} request to /api/chat from {request.remote_addr}")
-    if request.method == 'OPTIONS':
-        print(f"[DEBUG] Preflight headers: {dict(request.headers)}")
-        return '', 204
         
     try:
         data = request.json or {}
@@ -130,7 +127,12 @@ def chat():
 
 @app.route('/api/health', methods=['GET'])
 def health():
-    return jsonify({'status': 'healthy'})
+    # Pre-warm chatbot to avoid first-request latency
+    try:
+        get_chatbot()
+        return jsonify({'status': 'healthy', 'chatbot': 'initialized'})
+    except Exception as e:
+        return jsonify({'status': 'healthy', 'chatbot': f'error: {str(e)}'})
 
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')

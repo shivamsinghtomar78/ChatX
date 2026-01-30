@@ -32,7 +32,10 @@ export const useChat = (
         setError(null);
 
         try {
-            const response = await fetch(`${API_BASE_URL}/api/chat`, {
+            const api_url = `${API_BASE_URL}/api/chat`;
+            console.log(`[useChat] Calling API: ${api_url}`);
+
+            const response = await fetch(api_url, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
