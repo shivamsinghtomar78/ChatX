@@ -1,7 +1,12 @@
 from flask import Flask, request, jsonify, send_from_directory, send_file
 from flask_cors import CORS
-import uuid
+from dotenv import load_dotenv
 import os
+
+# Load environment variables FIRST for LangSmith/LangChain
+load_dotenv()
+
+import uuid
 from functools import wraps
 from time import time
 

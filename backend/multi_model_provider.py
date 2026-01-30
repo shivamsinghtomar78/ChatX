@@ -13,6 +13,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Optional, Dict, Any, List
 from dataclasses import dataclass, field
 from dotenv import load_dotenv
+from langsmith import traceable
 
 load_dotenv()
 
@@ -174,6 +175,7 @@ class MultiModelProvider:
                 if model.provider == "google":
                     model.enabled = False
     
+    @traceable(name="Call OpenRouter", run_type="llm")
     def _call_openrouter(self, model: ModelConfig, messages: List[Dict]) -> Optional[str]:
         """Call OpenRouter API for a specific model."""
         start_time = time.time()
@@ -226,6 +228,7 @@ class MultiModelProvider:
             print(f"[MultiModel] ✗ {model.name} error: {e}")
             return None
     
+    @traceable(name="Call Gemini", run_type="llm")
     def _call_gemini(self, model: ModelConfig, messages: List[Dict]) -> Optional[str]:
         """Call Gemini via LangChain."""
         start_time = time.time()
@@ -303,6 +306,7 @@ class MultiModelProvider:
             print(f"[MultiModel] Unknown provider: {model.provider}")
             return None
     
+    @traceable(name="Multi-Model Race", run_type="chain")
     def race_models(self, messages: Any) -> str:
         """
         Race all models concurrently. First valid response wins.
