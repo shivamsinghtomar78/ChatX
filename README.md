@@ -98,9 +98,13 @@ FREEPIK_API_KEY=your_key
 ## Structure
 ```
 ChatX/
-├── api_server.py           # Flask API
-├── langgraph_tool_backend.py # AI backend
-├── frontend/               # React app
-├── requirements.txt        # Dependencies
-└── .env                   # Config
+├── backend/               # Flask API & AI Logic
+│   ├── api_server.py      # Entry point
+│   ├── requirements.txt   # Dependencies
+│   └── .env               # Secrets
+├── frontend/              # React App
+│   ├── src/               # UI Logic
+│   └── vercel.json        # Vercel Config
+├── render.yaml            # Render Config (Points to backend/)
+└── README.md
 ```
