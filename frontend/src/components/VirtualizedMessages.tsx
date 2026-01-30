@@ -1,9 +1,11 @@
 "use client";
 
 import React, { memo, useCallback, useRef, useEffect } from 'react';
-import { VariableSizeList } from 'react-window';
+import * as ReactWindow from 'react-window';
 import MessageItem from './MessageItem';
 import { Message } from '@/types/chat';
+
+const { VariableSizeList } = ReactWindow as any;
 
 interface VirtualizedMessagesProps {
     messages: Message[];
@@ -30,7 +32,7 @@ const VirtualizedMessages = memo(({
     toggleReaction,
     windowHeight = 600
 }: VirtualizedMessagesProps) => {
-    const listRef = useRef<VariableSizeList>(null);
+    const listRef = useRef<any>(null);
     const itemHeightCache = useRef(new Map<number, number>());
     const itemRefs = useRef(new Map<number, HTMLElement>());
 
